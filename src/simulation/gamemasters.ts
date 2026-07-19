@@ -1,17 +1,23 @@
 import {
+  COUNCIL_FORMS,
   DIRECTORS,
   DIRECTOR_BY_ID,
   DIRECTOR_KNOBS,
   DIRECTOR_THOUGHTS,
+  QUALITY_META,
   QUESTION_LANGUAGE,
   VOICE_BY_ID,
 } from './content';
 import { clamp, lerp, mean, normalizedDifference, SeededRandom } from './random';
 import { QUALITY_KEYS } from './types';
 import type {
+  CivicProposal,
   CivicQuestion,
+  CouncilPosition,
   DirectorId,
   DirectorState,
+  Lesson,
+  ProposalMode,
   QualityKey,
   QualityMap,
   SimulationState,
@@ -69,6 +75,16 @@ function directorUrgency(id: DirectorId, state: SimulationState): number {
       return clamp(baseDeficit * 0.28 + unresolvedRatio(state) * 0.72 + (state.lessons.length > 0 ? 0.12 : 0));
     case 'wild':
       return clamp(baseDeficit * 0.67 + Math.max(0, linkHealth - 0.58) * 0.4 + Math.max(0, 0.55 - state.knobs.novelty) * 0.26);
+    case 'illustrator': {
+      const recent = state.works.slice(-6);
+      const distinctMotifs = new Set(recent.map((work) => work.art.motif)).size;
+      const visualRepetition = recent.length < 2 ? 0.28 : 1 - distinctMotifs / Math.min(6, recent.length);
+      return clamp(baseDeficit * 0.48 + visualRepetition * 0.46 + state.knobs.novelty * 0.16);
+    }
+    case 'architect':
+      return clamp(baseDeficit * 0.56 + (1 - linkHealth) * 0.34 + (1 - state.qualities.agency) * 0.26);
+    case 'storyweaver':
+      return clamp(baseDeficit * 0.4 + unresolvedRatio(state) * 0.48 + Math.max(0, state.works.length - state.lexicon.length) * 0.012);
   }
 }
 
@@ -139,6 +155,19 @@ function contextualThought(id: DirectorId, state: SimulationState, rng: SeededRa
   if (id === 'wild' && state.qualities.wonder > 0.72) {
     return 'Wonder is healthy. Making it stranger, not merely larger.';
   }
+  if (id === 'illustrator') {
+    return state.works.length === 0
+      ? 'Preparing a visible grammar for the first decision.'
+      : `Letting “${state.works.at(-1)?.title ?? 'the last decision'}” alter the world’s line.`;
+  }
+  if (id === 'architect') {
+    return state.civicPhase === 'council' || state.civicPhase === 'decision'
+      ? 'Testing whether the active council preserves a meaningful no.'
+      : 'Preparing a reversible structure for the next pressure.';
+  }
+  if (id === 'storyweaver' && state.history.length > 0) {
+    return `Tracing today’s pressure back through “${state.history[0]?.title ?? 'the first memory'}.”`;
+  }
   return `${rng.pick(DIRECTOR_THOUGHTS[id])} Watching ${weakest}.`;
 }
 
@@ -154,6 +183,15 @@ function focusForDirector(id: DirectorId, state: SimulationState, rng: SeededRan
       dominant.affinities[quality] < dominant.affinities[lowest] ? quality : lowest,
     );
     if (rng.next() < 0.68) return shadowQuality;
+  }
+
+  if (id === 'storyweaver') {
+    const unresolved = state.lessons.filter((lesson) => !lesson.resolved);
+    if (unresolved.length > 0 && rng.next() < 0.72) return rng.pick(unresolved).focus;
+  }
+
+  if (id === 'architect' && rng.next() < 0.68) {
+    return state.qualities.coherence < state.qualities.agency ? 'coherence' : 'agency';
   }
 
   const native = DIRECTOR_BY_ID[id].quality;
@@ -194,6 +232,9 @@ export function generateQuestion(state: SimulationState, rng: SeededRandom): Civ
   if (director.id === 'chorus') needs.plurality = Math.max(needs.plurality, 0.78);
   if (director.id === 'mirror') needs.agency = Math.max(needs.agency, 0.74);
   if (director.id === 'wild') needs.wonder = Math.max(needs.wonder, 0.8);
+  if (director.id === 'illustrator') needs.wonder = Math.max(needs.wonder, 0.72);
+  if (director.id === 'architect') needs.coherence = Math.max(needs.coherence, 0.74);
+  if (director.id === 'storyweaver') needs.reciprocity = Math.max(needs.reciprocity, 0.72);
 
   const pressure = clamp(
     0.28 +
@@ -254,4 +295,187 @@ export function bestAutonomousPair(state: SimulationState): [VoiceId, VoiceId] {
     }
   }
   return bestPair;
+}
+
+const PROPOSAL_MODES: readonly ProposalMode[] = [
+  'shared-minimum',
+  'carry-difference',
+  'reversible-trial',
+];
+
+const COST_QUALITY: Record<ProposalMode, QualityKey> = {
+  'shared-minimum': 'plurality',
+  'carry-difference': 'coherence',
+  'reversible-trial': 'reciprocity',
+};
+
+function relationshipWithAuthors(state: SimulationState, voiceId: VoiceId, authors: [VoiceId, VoiceId]): number {
+  if (authors.includes(voiceId)) return 0.72;
+  const links = state.relationships.filter(
+    (relationship) =>
+      (relationship.a === voiceId && authors.includes(relationship.b)) ||
+      (relationship.b === voiceId && authors.includes(relationship.a)),
+  );
+  return links.length > 0 ? mean(links.map((relationship) => relationship.strength)) : 0.12;
+}
+
+function proposalSupport(
+  state: SimulationState,
+  mode: ProposalMode,
+  voiceId: VoiceId,
+  authors: [VoiceId, VoiceId],
+  lesson?: Lesson,
+): number {
+  const question = state.currentQuestion;
+  if (!question) return 0;
+  const voice = VOICE_BY_ID[voiceId];
+  const form = COUNCIL_FORMS[mode];
+  const needsTotal = QUALITY_KEYS.reduce((sum, quality) => sum + question.needs[quality], 0);
+  const coverage =
+    QUALITY_KEYS.reduce((sum, quality) => sum + question.needs[quality] * voice.affinities[quality], 0) /
+    Math.max(0.01, needsTotal);
+  const formTotal = QUALITY_KEYS.reduce((sum, quality) => sum + form.supportWeights[quality], 0);
+  const formFit =
+    QUALITY_KEYS.reduce((sum, quality) => sum + form.supportWeights[quality] * voice.affinities[quality], 0) /
+    Math.max(0.01, formTotal);
+  const voiceState = state.voices.find((candidate) => candidate.id === voiceId);
+  const maxAttention = Math.max(1, ...state.voices.map((candidate) => candidate.attention));
+  const underheard = 1 - (voiceState?.attention ?? 0) / maxAttention;
+  const relationship = relationshipWithAuthors(state, voiceId, authors);
+  const lessonFit = lesson && (lesson.focus === question.focus || lesson.tags.some((tag) => question.tags.includes(tag))) ? 0.07 : 0;
+  const authorVoice = authors.includes(voiceId) ? 0.17 : 0;
+
+  return clamp(
+    (coverage - 0.5) * 0.82 +
+      (formFit - 0.5) * 0.68 +
+      (relationship - 0.18) * 0.42 +
+      underheard * 0.045 +
+      authorVoice +
+      lessonFit -
+      voice.affinities[COST_QUALITY[mode]] * 0.18 -
+      question.pressure * 0.11,
+    -1,
+    1,
+  );
+}
+
+function councilPosition(support: number): CouncilPosition {
+  if (support >= 0.1) return 'consent';
+  if (support > -0.18) return 'stand-aside';
+  return 'object';
+}
+
+function proposalCopy(
+  mode: ProposalMode,
+  authors: [VoiceId, VoiceId],
+  question: CivicQuestion,
+): { title: string; summary: string; decision: string } {
+  const a = VOICE_BY_ID[authors[0]];
+  const b = VOICE_BY_ID[authors[1]];
+  if (mode === 'shared-minimum') {
+    return {
+      title: `${a.shortName} and ${b.shortName} name the minimum`,
+      summary: `${a.gift}, held answerable by ${b.gift}.`,
+      decision: `For “${question.title},” act only on what these meanings can safely share; leave every other reason untranslated.`,
+    };
+  }
+  if (mode === 'carry-difference') {
+    return {
+      title: `${a.shortName} and ${b.shortName} keep both reasons visible`,
+      summary: `${a.shortName} may ${a.verb}; ${b.shortName} may ${b.verb}. Coordination does not require one account to win.`,
+      decision: `Answer “${question.title}” through a braid whose unlike strands remain named and challengeable.`,
+    };
+  }
+  return {
+    title: `A reversible answer to ${question.title.toLowerCase()}`,
+    summary: `${a.shortName} and ${b.shortName} try a bounded civic practice with an explicit right to stop and revise it.`,
+    decision: `Let this answer live for three encounters, then return it to council with its consequences visible.`,
+  };
+}
+
+export function generateCouncilProposals(
+  state: SimulationState,
+  authors: [VoiceId, VoiceId],
+  lesson: Lesson | undefined,
+  rng: SeededRandom,
+): CivicProposal[] {
+  const question = state.currentQuestion;
+  if (!question) return [];
+
+  return PROPOSAL_MODES.map((mode, index) => {
+    const form = COUNCIL_FORMS[mode];
+    const support = Object.fromEntries(
+      state.voices.map((voice) => [voice.id, proposalSupport(state, mode, voice.id, authors, lesson)]),
+    ) as Record<VoiceId, number>;
+    const positions = Object.fromEntries(
+      state.voices.map((voice) => [voice.id, councilPosition(support[voice.id])]),
+    ) as Record<VoiceId, CouncilPosition>;
+    const copy = proposalCopy(mode, authors, question);
+    const workKind =
+      question.focus === 'biosphere' && mode === 'reversible-trial'
+        ? 'ecological-covenant'
+        : rng.pick(form.workKinds);
+
+    return {
+      id: `proposal-${state.epoch}-${state.cycle}-${index}-${rng.state.toString(16)}`,
+      mode,
+      ...copy,
+      cost: {
+        quality: COST_QUALITY[mode],
+        amount: form.costAmount,
+        description: form.shadow,
+      },
+      workKind,
+      art: {
+        motif: form.motif,
+        geometry: form.geometry,
+        motion: form.motion,
+        palette: [
+          VOICE_BY_ID[authors[0]].cssColor,
+          VOICE_BY_ID[authors[1]].cssColor,
+          QUALITY_META[question.focus].color,
+        ],
+        density: clamp(0.42 + question.pressure * 0.24 + index * 0.055),
+        symmetry: mode === 'shared-minimum' ? 0.72 : mode === 'carry-difference' ? 0.28 : 0.46,
+        texture: mode === 'carry-difference' ? 'visible seams and counterflow' : mode === 'shared-minimum' ? 'a narrow luminous threshold' : 'porous layers with an unfinished edge',
+        caption: form.label,
+      },
+      source: 'deterministic',
+      authors,
+      focus: question.focus,
+      support,
+      positions,
+      promise: form.promise,
+      shadow: form.shadow,
+      lessonId: lesson?.id,
+    } satisfies CivicProposal;
+  });
+}
+
+export function proposalHasConsent(proposal: CivicProposal): boolean {
+  const values = Object.values(proposal.positions);
+  const consent = values.filter((position) => position === 'consent').length;
+  const objections = values.filter((position) => position === 'object').length;
+  const hardObjection = Object.values(proposal.support).some((support) => support < -0.42);
+  if (proposal.mode === 'shared-minimum') return consent >= 4 && objections <= 1 && !hardObjection;
+  if (proposal.mode === 'carry-difference') return consent >= 3 && objections <= 2;
+  return consent >= 3 && objections <= 2 && !hardObjection;
+}
+
+export function bestAutonomousProposal(state: SimulationState, proposals: CivicProposal[]): CivicProposal | undefined {
+  const repeatedMode = state.works.at(-1)?.mode;
+  const scored = proposals.map((proposal) => {
+    const values = Object.values(proposal.support);
+    const average = mean(values);
+    const floor = Math.min(...values);
+    const underheardAuthors = mean(
+      proposal.authors.map((id) => 1 / (1 + (state.voices.find((voice) => voice.id === id)?.attention ?? 0))),
+    );
+    const passes = proposalHasConsent(proposal) ? 0.34 : 0;
+    const novelty = proposal.mode === repeatedMode ? -0.12 : 0.08;
+    const repair = (1 - state.qualities[proposal.focus]) * 0.1;
+    return { proposal, score: passes + average * 0.42 + floor * 0.2 + underheardAuthors * 0.15 + novelty + repair };
+  });
+  scored.sort((a, b) => b.score - a.score || a.proposal.id.localeCompare(b.proposal.id));
+  return scored[0]?.proposal;
 }

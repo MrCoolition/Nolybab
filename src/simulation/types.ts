@@ -7,8 +7,18 @@ export const QUALITY_KEYS = [
   'wonder',
 ] as const;
 
+export const NANO_MODEL_ID = 'gpt-5.4-nano' as const;
+
 export type QualityKey = (typeof QUALITY_KEYS)[number];
-export type DirectorId = 'chorus' | 'ecology' | 'mirror' | 'archivist' | 'wild';
+export type DirectorId =
+  | 'chorus'
+  | 'ecology'
+  | 'mirror'
+  | 'archivist'
+  | 'wild'
+  | 'illustrator'
+  | 'architect'
+  | 'storyweaver';
 export type VoiceId =
   | 'pioneers'
   | 'innovators'
@@ -19,6 +29,23 @@ export type VoiceId =
   | 'mountaineers';
 
 export type QualityMap = Record<QualityKey, number>;
+export type CivicPhase = 'pressure' | 'council' | 'decision' | 'action' | 'growth';
+export type ProposalMode = 'shared-minimum' | 'carry-difference' | 'reversible-trial';
+export type ProposalSource = 'deterministic' | 'nano';
+export type CouncilPosition = 'consent' | 'stand-aside' | 'object';
+export type CivicWorkKind =
+  | 'shared-word'
+  | 'listening-ritual'
+  | 'consent-protocol'
+  | 'memory-practice'
+  | 'ecological-covenant'
+  | 'open-question'
+  | 'witness-circle'
+  | 'translation-braid';
+
+export type ArtMotif = 'braid' | 'ring' | 'scar' | 'current' | 'constellation' | 'threshold' | 'mycelium';
+export type ArtGeometry = 'radial' | 'braided' | 'branching' | 'orbital' | 'layered';
+export type ArtMotion = 'breathe' | 'drift' | 'pulse' | 'ripple' | 'still';
 
 export interface VoiceDefinition {
   id: VoiceId;
@@ -61,6 +88,7 @@ export interface DirectorDefinition {
   color: string;
   quality: QualityKey;
   mandate: string;
+  specialist: 'system' | 'council' | 'narrative' | 'illustration';
 }
 
 export interface DirectorState {
@@ -137,6 +165,122 @@ export interface MemoryEntry {
   detail: string;
 }
 
+export interface ProceduralArtDirection {
+  motif: ArtMotif;
+  geometry: ArtGeometry;
+  motion: ArtMotion;
+  palette: string[];
+  density: number;
+  symmetry: number;
+  texture: string;
+  caption: string;
+}
+
+export type CivicArtDirection = ProceduralArtDirection;
+
+export interface CivicCost {
+  quality: QualityKey;
+  amount: number;
+  description: string;
+}
+
+export interface CivicProposal {
+  id: string;
+  mode: ProposalMode;
+  title: string;
+  summary: string;
+  decision: string;
+  cost: CivicCost;
+  workKind: CivicWorkKind;
+  art: ProceduralArtDirection;
+  source: ProposalSource;
+  authors: [VoiceId, VoiceId];
+  focus: QualityKey;
+  support: Record<VoiceId, number>;
+  positions: Record<VoiceId, CouncilPosition>;
+  promise: string;
+  shadow: string;
+  lessonId?: string;
+}
+
+export interface CouncilSession {
+  id: string;
+  questionId: string;
+  name: string;
+  phaseSeconds: number;
+  autoBeatSeconds: number;
+  authors: [VoiceId, VoiceId];
+  heardVoices: VoiceId[];
+  proposals: CivicProposal[];
+  selectedProposalId: string | null;
+  lessonId?: string;
+  autonomous: boolean;
+  voicesLine?: string;
+  voiceStatements?: Partial<Record<VoiceId, string>>;
+  worldLine?: string;
+  illustration?: ProceduralArtDirection;
+  pendingWork?: CivicWork;
+  outcome?: WeaveOutcome;
+}
+
+export interface CivicWork {
+  id: string;
+  proposalId: string;
+  kind: CivicWorkKind;
+  mode: ProposalMode;
+  title: string;
+  summary: string;
+  decision: string;
+  focus: QualityKey;
+  participants: VoiceId[];
+  dissenters: VoiceId[];
+  bornAt: number;
+  bornInEpoch: number;
+  maturity: number;
+  resonance: number;
+  echoes: number;
+  status: 'living' | 'contested' | 'composted';
+  source: ProposalSource;
+  art: ProceduralArtDirection;
+  glyphSeed: number;
+}
+
+export interface NanoProposalDirection {
+  mode: ProposalMode;
+  title: string;
+  summary: string;
+  decision: string;
+  cost: string;
+  workKind: CivicWorkKind | string;
+  art: string | Partial<ProceduralArtDirection>;
+}
+
+export interface NanoVoiceDirection {
+  voiceId: VoiceId;
+  statement: string;
+}
+
+export interface NanoSpecialistDirections {
+  illustrator: string;
+  architect: string;
+  storyweaver: string;
+}
+
+/**
+ * Untrusted display enrichment returned by the Nano client. The deterministic
+ * simulation validates this shape and never accepts qualities, odds, votes,
+ * timers, IDs, or direct state mutations from the model.
+ */
+export interface NanoCouncilDirection {
+  model?: typeof NANO_MODEL_ID;
+  councilName?: string;
+  voices?: NanoVoiceDirection[];
+  proposals: NanoProposalDirection[];
+  gamemasters?: NanoSpecialistDirections;
+  worldLine?: string;
+  illustration?: string | Partial<ProceduralArtDirection>;
+}
+
 export interface WeaveOutcome {
   id: string;
   kind: 'synthesis' | 'productive-mistake' | 'reframe';
@@ -146,6 +290,8 @@ export interface WeaveOutcome {
   focus: QualityKey;
   autonomous: boolean;
   probability: number;
+  proposalId?: string;
+  workId?: string;
   sharedWord?: SharedWord;
   lesson?: Lesson;
   reframedLessonId?: string;
@@ -167,6 +313,11 @@ export interface SimulationState {
   relationships: RelationshipState[];
   directors: DirectorState[];
   knobs: GamemasterKnobs;
+  civicPhase: CivicPhase;
+  council: CouncilSession | null;
+  works: CivicWork[];
+  archivedWorkCount: number;
+  actionSeconds: number;
   currentQuestion: CivicQuestion | null;
   interludeSeconds: number;
   lessons: Lesson[];
@@ -175,6 +326,7 @@ export interface SimulationState {
   history: MemoryEntry[];
   resolvedQuestions: number;
   autonomousResponses: number;
+  coerciveAutonomousResponses: number;
   lastPair: [VoiceId, VoiceId] | null;
 }
 

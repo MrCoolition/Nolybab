@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { QUALITY_META, VOICES, VOICE_BY_ID } from '../simulation/content';
 import { clamp } from '../simulation/random';
 import type { NolybabSimulation } from '../simulation/NolybabSimulation';
-import type { Lesson, SimulationSnapshot, VoiceId } from '../simulation/types';
+import type { CivicWork, Lesson, SimulationSnapshot, VoiceId, WeaveOutcome } from '../simulation/types';
 
 interface Point {
   x: number;
@@ -39,6 +39,7 @@ export class NolybabScene extends Phaser.Scene {
   private world!: Phaser.GameObjects.Graphics;
   private light!: Phaser.GameObjects.Graphics;
   private labels = new Map<VoiceId, Phaser.GameObjects.Text>();
+  private selectionLabels = new Map<VoiceId, Phaser.GameObjects.Text>();
   private voicePositions = new Map<VoiceId, VoiceScreenState>();
   private lessonPositions = new Map<string, VoiceScreenState>();
   private selectedVoices: VoiceId[] = [];
@@ -46,6 +47,7 @@ export class NolybabScene extends Phaser.Scene {
   private dust: DustMote[] = [];
   private hoveredVoice: VoiceId | null = null;
   private reducedMotion = false;
+  private outcomeFx: { outcome: WeaveOutcome; startedAt: number } | null = null;
 
   constructor(simulation: NolybabSimulation) {
     super({ key: 'NolybabScene' });
@@ -58,6 +60,10 @@ export class NolybabScene extends Phaser.Scene {
 
   setSelectedLesson(lessonId: string | null): void {
     this.selectedLessonId = lessonId;
+  }
+
+  playOutcome(outcome: WeaveOutcome): void {
+    this.outcomeFx = { outcome, startedAt: this.time.now / 1000 };
   }
 
   create(): void {
@@ -108,6 +114,18 @@ export class NolybabScene extends Phaser.Scene {
       label.setOrigin(0.5, 0);
       label.setDepth(4);
       this.labels.set(voice.id, label);
+
+      const selectionLabel = this.add.text(0, 0, '', {
+        fontFamily: 'Cascadia Mono, Consolas, monospace',
+        fontSize: '9px',
+        color: '#0b1210',
+        backgroundColor: '#e8ddbd',
+        padding: { x: 4, y: 2 },
+      });
+      selectionLabel.setOrigin(0.5);
+      selectionLabel.setDepth(6);
+      selectionLabel.setVisible(false);
+      this.selectionLabels.set(voice.id, selectionLabel);
     }
   }
 
@@ -117,9 +135,9 @@ export class NolybabScene extends Phaser.Scene {
     if (width < 2 || height < 2) return;
     const mobile = width < 720;
     const cx = width * (mobile ? 0.5 : 0.48);
-    const cy = height * (mobile ? 0.49 : 0.52);
+    const cy = height * (mobile ? 0.47 : 0.49);
     const radiusX = Math.min(width * (mobile ? 0.42 : 0.34), height * (mobile ? 0.24 : 0.4));
-    const radiusY = mobile ? Math.min(height * 0.28, radiusX * 1.42) : Math.min(height * 0.35, radiusX * 0.72);
+    const radiusY = mobile ? Math.min(height * 0.25, radiusX * 1.34) : Math.min(height * 0.31, radiusX * 0.7);
     const breath = this.reducedMotion ? 0 : Math.sin(time * Math.PI * 0.2);
     const epochShift = snapshot.epoch * 0.37;
 
@@ -133,9 +151,11 @@ export class NolybabScene extends Phaser.Scene {
     this.drawRelationships(snapshot, time, cx, cy);
     this.drawEcologicalCurrents(snapshot, time, width, height, cx, cy, breath);
     this.drawMountain(snapshot, time, cx, cy, radiusX, radiusY, breath);
+    this.drawCivicWorks(snapshot, time, cx, cy, radiusX, radiusY, breath);
     this.drawLexicon(snapshot, time, cx, cy, radiusX, radiusY);
     this.drawVoices(snapshot, time, mobile, breath);
     this.drawSelectionPreview(time, cx, cy);
+    this.drawOutcomeFx(time, cx, cy, radiusX, radiusY);
   }
 
   private drawAtmosphere(
@@ -375,6 +395,224 @@ export class NolybabScene extends Phaser.Scene {
     }
   }
 
+  private drawCivicWorks(
+    snapshot: SimulationSnapshot,
+    time: number,
+    cx: number,
+    cy: number,
+    radiusX: number,
+    radiusY: number,
+    breath: number,
+  ): void {
+    const works = snapshot.works.slice(-54);
+    const builtWeight = snapshot.archivedWorkCount * 0.18 + works.reduce((sum, work) => sum + 0.35 + work.maturity * 0.65, 0);
+    const growthRadius = Math.min(radiusX * 0.38, 42 + Math.sqrt(Math.max(1, builtWeight)) * 13);
+    const terraces = Math.max(1, Math.min(12, snapshot.epoch + 1 + Math.floor((works.length + snapshot.archivedWorkCount) / 7)));
+
+    for (let terrace = 0; terrace < terraces; terrace += 1) {
+      const progress = (terrace + 1) / terraces;
+      this.drawIrregularLoop(
+        this.world,
+        cx,
+        cy,
+        growthRadius * (0.45 + progress * 0.66) + breath * 0.9,
+        growthRadius * (0.22 + progress * 0.31),
+        54,
+        snapshot.seed + terrace * 211,
+        time * (this.reducedMotion ? 0 : 0.012) + terrace * 0.4,
+        1.6 + snapshot.qualities.wonder * 2.2,
+        terrace === terraces - 1 ? WATER : BONE,
+        0.045 + progress * 0.025,
+        terrace === terraces - 1 ? 1 : 0.55,
+      );
+    }
+
+    if (works.length === 0) {
+      this.world.lineStyle(0.8, WATER, 0.16);
+      this.world.strokeCircle(cx, cy, 34 + breath);
+      this.world.fillStyle(BONE, 0.22);
+      this.world.fillCircle(cx, cy, 2.2);
+      return;
+    }
+
+    works.forEach((work, index) => {
+      const turn = ((work.glyphSeed % 8192) / 8192) * Math.PI * 2 + Math.floor(index / 10) * 0.23;
+      const ring = 0.13 + (index % 9) * 0.023 + Math.floor(index / 9) * 0.045;
+      const x = cx + Math.cos(turn) * radiusX * Math.min(0.43, ring);
+      const y = cy + Math.sin(turn) * radiusY * Math.min(0.43, ring) * 0.8;
+      const maturity = clamp(work.maturity, 0.05, 1);
+      const size = 4.5 + maturity * 7 + Math.min(4, work.echoes * 0.5);
+      const color = this.artColor(work, 0);
+      const secondary = this.artColor(work, 1);
+
+      for (const participant of work.participants.slice(0, 3)) {
+        const voice = this.voicePositions.get(participant);
+        if (!voice) continue;
+        this.world.lineStyle(0.45 + work.resonance * 0.5, color, 0.035 + work.resonance * 0.055);
+        this.world.beginPath();
+        this.world.moveTo(x, y);
+        this.world.lineTo(voice.x, voice.y);
+        this.world.strokePath();
+      }
+
+      const motion = this.reducedMotion ? 0 : this.workMotion(work, time);
+      this.light.fillStyle(color, 0.012 + maturity * 0.026);
+      this.light.fillCircle(x, y, size * (2.1 + motion * 0.08));
+      this.drawWorkGlyph(work, x, y, size, time, color, secondary, maturity);
+
+      if (index === works.length - 1 && (snapshot.civicPhase === 'action' || snapshot.civicPhase === 'growth')) {
+        this.world.lineStyle(1, SUN, 0.24 + Math.sin(time * 2.1) * 0.1);
+        this.world.strokeCircle(x, y, size * (1.8 + Math.max(0, breath) * 0.08));
+      }
+    });
+  }
+
+  private drawWorkGlyph(
+    work: CivicWork,
+    x: number,
+    y: number,
+    size: number,
+    time: number,
+    color: number,
+    secondary: number,
+    maturity: number,
+  ): void {
+    const phase = this.reducedMotion ? 0 : time * 0.12 + work.glyphSeed * 0.01;
+    const layers = 1 + Math.round(work.art.density * 3);
+    const symmetry = 3 + Math.round(work.art.symmetry * 5);
+    const contested = work.status === 'contested';
+    this.world.lineStyle(0.7 + maturity * 0.8, contested ? SCAR : color, 0.25 + maturity * 0.42);
+
+    if (work.art.motif === 'braid' || work.art.geometry === 'braided') {
+      for (let strand = -1; strand <= 1; strand += 2) {
+        this.world.beginPath();
+        for (let step = 0; step <= 18; step += 1) {
+          const t = step / 18;
+          const px = x - size + t * size * 2;
+          const py = y + Math.sin(t * Math.PI * 3 + phase + strand) * size * 0.32 * strand;
+          if (step === 0) this.world.moveTo(px, py);
+          else this.world.lineTo(px, py);
+        }
+        this.world.strokePath();
+      }
+    } else if (work.art.motif === 'threshold') {
+      this.world.beginPath();
+      this.world.moveTo(x - size, y + size * 0.72);
+      this.world.lineTo(x - size, y - size * 0.7);
+      this.world.lineTo(x + size, y - size * 0.7);
+      this.world.lineTo(x + size, y + size * 0.72);
+      this.world.strokePath();
+      this.world.lineStyle(0.7, secondary, 0.42);
+      this.world.beginPath();
+      this.world.moveTo(x, y - size * 0.7);
+      this.world.lineTo(x, y + size * 0.9);
+      this.world.strokePath();
+    } else if (work.art.motif === 'mycelium' || work.art.geometry === 'branching') {
+      for (let branch = 0; branch < symmetry; branch += 1) {
+        const angle = (branch / symmetry) * Math.PI * 2 + phase * 0.15;
+        this.world.beginPath();
+        this.world.moveTo(x, y);
+        this.world.lineTo(x + Math.cos(angle) * size * 0.62, y + Math.sin(angle) * size * 0.46);
+        this.world.lineTo(x + Math.cos(angle + 0.18) * size * 1.18, y + Math.sin(angle + 0.18) * size * 0.88);
+        this.world.strokePath();
+        this.world.fillStyle(secondary, 0.36);
+        this.world.fillCircle(x + Math.cos(angle + 0.18) * size * 1.18, y + Math.sin(angle + 0.18) * size * 0.88, 0.8 + maturity);
+      }
+    } else if (work.art.motif === 'constellation') {
+      const points: Point[] = [];
+      for (let star = 0; star < symmetry; star += 1) {
+        const angle = (star / symmetry) * Math.PI * 2 + phase * 0.06;
+        const distance = size * (0.48 + ((work.glyphSeed >> star) & 3) * 0.18);
+        points.push({ x: x + Math.cos(angle) * distance, y: y + Math.sin(angle) * distance * 0.72 });
+      }
+      this.world.strokePoints(points, true);
+      this.world.fillStyle(secondary, 0.5);
+      points.forEach((point, index) => this.world.fillCircle(point.x, point.y, 0.8 + (index % 2) * 0.6));
+    } else if (work.art.motif === 'current') {
+      for (let layer = 0; layer < layers; layer += 1) {
+        const offset = (layer - (layers - 1) / 2) * size * 0.28;
+        this.world.beginPath();
+        for (let step = 0; step <= 20; step += 1) {
+          const t = step / 20;
+          const px = x - size + t * size * 2;
+          const py = y + offset + Math.sin(t * Math.PI * 2 + phase) * size * 0.18;
+          if (step === 0) this.world.moveTo(px, py);
+          else this.world.lineTo(px, py);
+        }
+        this.world.strokePath();
+      }
+    } else if (work.art.motif === 'scar') {
+      this.world.beginPath();
+      this.world.moveTo(x - size, y - size * 0.5);
+      this.world.lineTo(x - size * 0.28, y - size * 0.08);
+      this.world.lineTo(x - size * 0.05, y + size * 0.42);
+      this.world.lineTo(x + size * 0.38, y - size * 0.18);
+      this.world.lineTo(x + size, y + size * 0.52);
+      this.world.strokePath();
+    } else {
+      for (let layer = 0; layer < layers; layer += 1) {
+        this.world.lineStyle(0.65 + maturity * 0.55, layer % 2 === 0 ? color : secondary, 0.22 + maturity * 0.33);
+        this.world.strokeCircle(x, y, size * (0.45 + layer * 0.24));
+      }
+    }
+
+    this.world.fillStyle(contested ? SCAR : BONE, 0.32 + maturity * 0.34);
+    this.world.fillCircle(x, y, 1.1 + maturity * 1.2);
+  }
+
+  private drawOutcomeFx(time: number, cx: number, cy: number, radiusX: number, radiusY: number): void {
+    const fx = this.outcomeFx;
+    if (!fx) return;
+    const age = time - fx.startedAt;
+    if (age < 0 || age > 4) {
+      this.outcomeFx = null;
+      return;
+    }
+    const progress = clamp(age / 2.8, 0, 1);
+    const fade = 1 - clamp((age - 2.5) / 1.5, 0, 1);
+    const target = { x: cx, y: cy - radiusY * 0.02 };
+    fx.outcome.voices.forEach((voiceId, voiceIndex) => {
+      const start = this.voicePositions.get(voiceId);
+      if (!start) return;
+      const color = VOICE_BY_ID[voiceId].color;
+      const control = { x: (start.x + target.x) / 2 + (voiceIndex ? 1 : -1) * radiusX * 0.08, y: cy - radiusY * 0.24 };
+      for (let mote = 0; mote < 8; mote += 1) {
+        const t = clamp(progress * 1.2 - mote * 0.065, 0, 1);
+        const point = this.quadraticPoint(start, control, target, t);
+        this.light.fillStyle(color, fade * (0.12 + t * 0.42));
+        this.light.fillCircle(point.x, point.y, 1.2 + (mote % 3) * 0.6);
+      }
+    });
+
+    const ringColor = fx.outcome.kind === 'productive-mistake' ? SCAR : fx.outcome.kind === 'reframe' ? GROWTH : SUN;
+    this.world.lineStyle(1.2, ringColor, fade * (0.48 - progress * 0.22));
+    this.world.strokeEllipse(target.x, target.y, 18 + progress * 82, 9 + progress * 40);
+    if (fx.outcome.kind === 'productive-mistake') {
+      this.world.beginPath();
+      this.world.moveTo(target.x - 4, target.y - 3);
+      this.world.lineTo(target.x + progress * 18, target.y + progress * 12);
+      this.world.lineTo(target.x - progress * 25, target.y + progress * 25);
+      this.world.strokePath();
+    }
+  }
+
+  private artColor(work: CivicWork, index: number): number {
+    const fallback = QUALITY_META[work.focus].color;
+    const value = work.art.palette[index] ?? work.art.palette[0] ?? fallback;
+    return /^#[0-9a-f]{6}$/i.test(value) ? Phaser.Display.Color.HexStringToColor(value).color : Phaser.Display.Color.HexStringToColor(fallback).color;
+  }
+
+  private workMotion(work: CivicWork, time: number): number {
+    const phase = time + work.glyphSeed * 0.013;
+    switch (work.art.motion) {
+      case 'breathe': return Math.sin(phase * 0.8);
+      case 'drift': return Math.sin(phase * 0.23) * 0.7;
+      case 'pulse': return Math.sin(phase * 1.8);
+      case 'ripple': return Math.sin(phase * 1.15 + Math.sin(phase * 0.2));
+      case 'still': return 0;
+    }
+  }
+
   private drawLexicon(
     snapshot: SimulationSnapshot,
     time: number,
@@ -463,9 +701,9 @@ export class NolybabScene extends Phaser.Scene {
         const above =
           state.id !== 'pioneers' &&
           (Math.sin(definition.angle) < -0.15 || position.y > this.scale.height * 0.67);
-        const title = mobile ? definition.shortName : `${definition.shortName}\n${definition.domain}`;
+        const title = mobile || (!selected && !hovered) ? definition.shortName : `${definition.shortName}\n${definition.domain}`;
         label.setText(title);
-        label.setFontSize(mobile ? 12 : 15);
+        label.setFontSize(mobile ? 11 : selected || hovered ? 15 : 13);
         label.setAlpha(selected || hovered ? 1 : 0.7);
         label.setPosition(position.x, above ? position.y - radius - (mobile ? 28 : 44) : position.y + radius + 9);
         label.setOrigin(0.5, above ? 0 : 0);
@@ -474,6 +712,16 @@ export class NolybabScene extends Phaser.Scene {
       if (selected) {
         this.world.lineStyle(1, BONE, 0.38);
         this.world.strokeCircle(position.x, position.y, radius * 1.42 + Math.sin(time * 1.4 + index) * 2);
+      }
+
+      const selectionLabel = this.selectionLabels.get(state.id);
+      if (selectionLabel) {
+        const seat = this.selectedVoices.indexOf(state.id);
+        selectionLabel.setVisible(seat >= 0);
+        if (seat >= 0) {
+          selectionLabel.setText(String(seat + 1));
+          selectionLabel.setPosition(position.x + radius * 0.76, position.y - radius * 0.76);
+        }
       }
     });
   }

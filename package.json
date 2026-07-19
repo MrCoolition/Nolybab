@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "phaser": "3.90.0"
   },
   "devDependencies": {

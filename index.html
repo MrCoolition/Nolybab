@@ -23,9 +23,10 @@
             <span id="breath-mark" class="breath-mark" aria-label="World is breathing"></span>
           </div>
           <p id="epoch-label" class="epoch-label">Seed epoch · pulse 0</p>
+          <p id="archive-status" class="archive-status" data-status="local"><i></i> local memory</p>
         </header>
 
-        <section id="question-cluster" class="question-cluster" aria-live="polite">
+        <section id="question-cluster" class="question-cluster">
           <div class="question-origin">
             <span id="director-sigil" class="director-sigil"></span>
             <span id="question-origin">The Chorus is listening</span>
@@ -37,7 +38,7 @@
         </section>
 
         <aside class="civic-knot" aria-label="Civic vital signs">
-          <button id="knot-toggle" class="knot-button" aria-expanded="false" aria-controls="quality-list">
+          <button id="knot-toggle" class="knot-button" aria-label="Civic knot" aria-expanded="false" aria-controls="quality-list">
             <span id="knot-glyph" class="knot-glyph" aria-hidden="true">
               <i></i><i></i><i></i><i></i>
             </span>
@@ -52,38 +53,51 @@
           <button id="sound-button" class="glyph-button" type="button" aria-label="Enable generative sound" title="Sound">◌</button>
         </nav>
 
-        <div id="onboarding-nudge" class="onboarding-nudge">
-          <span>01 · listen</span>
-          Touch two distant voices. Difference is the instrument.
-        </div>
+        <section id="voice-dock" class="voice-dock council-surface" aria-label="The living council">
+          <header class="council-cycle">
+            <ol id="cycle-steps" aria-label="Civic cycle">
+              <li data-phase="pressure"><b>01</b><span>Pressure</span></li>
+              <li data-phase="council"><b>02</b><span>Council</span></li>
+              <li data-phase="decision"><b>03</b><span>Decide</span></li>
+              <li data-phase="action"><b>04</b><span>Act</span></li>
+              <li data-phase="growth"><b>05</b><span>Grow</span></li>
+            </ol>
+            <p id="stage-instruction">Seat two unlike voices. Difference is the instrument.</p>
+            <span id="nano-status" class="nano-status" data-status="quiet"><i></i> Nano atelier</span>
+          </header>
 
-        <section id="voice-dock" class="voice-dock" aria-label="Selected voices">
-          <div class="selection-copy">
-            <span class="dock-label">Council thread</span>
-            <div id="selected-voices" class="selected-voices">
-              <span class="empty-selection">No voices held</span>
+          <div class="council-body">
+            <div class="council-choosing">
+              <div class="selection-copy">
+                <span class="dock-label">Council seats</span>
+                <div id="selected-voices" class="selected-voices">
+                  <span class="empty-selection">Two voices are waiting to be heard</span>
+                </div>
+                <button id="lesson-chip" class="lesson-chip" type="button" hidden></button>
+              </div>
+              <div id="voice-roster" class="voice-roster" aria-label="Available voices"></div>
             </div>
-            <button id="lesson-chip" class="lesson-chip" type="button" hidden></button>
+            <div id="proposal-list" class="proposal-list" aria-label="Council proposals" hidden></div>
+            <button id="weave-button" class="weave-button" type="button" disabled>
+              <span>Convene the council</span>
+              <small>Enter</small>
+            </button>
           </div>
-          <button id="weave-button" class="weave-button" type="button" disabled>
-            <span>Weave these truths</span>
-            <small>Enter</small>
-          </button>
         </section>
 
         <nav class="edge-rail" aria-label="Nolybab records and systems">
-          <button id="memory-button" class="rail-button" type="button" aria-expanded="false" aria-controls="memory-drawer">
+          <button id="memory-button" class="rail-button" type="button" aria-label="Memory" aria-expanded="false" aria-controls="memory-drawer">
             <span>Memory</span><b id="memory-count">0</b>
           </button>
-          <button id="directors-button" class="rail-button" type="button" aria-expanded="false" aria-controls="directors-drawer">
-            <span>Gamemasters</span><b id="active-director-count">5</b>
+          <button id="directors-button" class="rail-button" type="button" aria-label="Gamemasters" aria-expanded="false" aria-controls="directors-drawer">
+            <span>Gamemasters</span><b id="active-director-count">8</b>
           </button>
-          <button id="codex-button" class="rail-button" type="button" aria-expanded="false" aria-controls="codex-drawer">
-            <span>Premise</span><b>?</b>
+          <button id="codex-button" class="rail-button" type="button" aria-label="How it works" aria-expanded="false" aria-controls="codex-drawer">
+            <span>How it works</span><b>?</b>
           </button>
         </nav>
 
-        <aside id="memory-drawer" class="side-drawer" aria-hidden="true">
+        <aside id="memory-drawer" class="side-drawer" aria-hidden="true" inert>
           <div class="drawer-heading">
             <div><span class="eyebrow">Nothing is erased</span><h2>Memory thread</h2></div>
             <button class="drawer-close" data-close="memory-drawer" aria-label="Close memory">×</button>
@@ -93,36 +107,65 @@
           <div id="history-list" class="history-list"></div>
         </aside>
 
-        <aside id="directors-drawer" class="side-drawer" aria-hidden="true">
+        <aside id="directors-drawer" class="side-drawer" aria-hidden="true" inert>
           <div class="drawer-heading">
             <div><span class="eyebrow">Always at the knobs</span><h2>Internal gamemasters</h2></div>
             <button class="drawer-close" data-close="directors-drawer" aria-label="Close gamemasters">×</button>
           </div>
-          <p class="drawer-intro">Five adaptive minds read the same civilization differently. Their influence changes continuously; none is allowed to rule alone.</p>
+          <p class="drawer-intro">Eight adaptive minds read the same civilization differently. The Illustrator, Architect, and Storyweaver can be amplified by GPT-5.4 Nano; the living rules remain sovereign.</p>
+          <div id="ai-disclosure" class="ai-disclosure" data-status="quiet">
+            <i></i><div><strong>GPT-5.4 Nano atelier</strong><span id="ai-disclosure-copy">Procedural fallback is awake. Nano joins when a server key is present.</span></div>
+          </div>
           <div id="director-list" class="director-list"></div>
           <div id="knob-list" class="knob-list"></div>
         </aside>
 
-        <aside id="codex-drawer" class="side-drawer codex-drawer" aria-hidden="true">
+        <aside id="codex-drawer" class="side-drawer codex-drawer" aria-hidden="true" inert>
           <div class="drawer-heading">
-            <div><span class="eyebrow">The reverse tower</span><h2>What Nolybab is</h2></div>
-            <button class="drawer-close" data-close="codex-drawer" aria-label="Close premise">×</button>
+            <div><span class="eyebrow">The reverse tower</span><h2>How the world moves</h2></div>
+            <button class="drawer-close" data-close="codex-drawer" aria-label="Close guide">×</button>
           </div>
-          <p class="codex-lead">Civilization as we knew it optimized itself to death. Nolybab begins again—not by finding one perfect answer, but by learning how unlike truths can remain unlike and still act together.</p>
-          <dl class="premise-list">
-            <div><dt>Listen</dt><dd>Read a voice on its own terms.</dd></div>
-            <div><dt>Weave</dt><dd>Make two incomplete truths answer the same living question.</dd></div>
-            <div><dt>Challenge</dt><dd>Interrupt any voice—including the helpful system—when it becomes absolute.</dd></div>
-            <div><dt>Reframe</dt><dd>Bring a remembered mistake forward as a new civic sense.</dd></div>
-          </dl>
-          <p class="codex-note">There is no final victory and no reload-worthy failure. A balanced Dawn changes the rules. A collapse composts into the next epoch. The organism keeps its memory either way.</p>
-          <button id="new-seed-button" class="danger-link" type="button">Begin with a different surviving truth</button>
+          <div class="guide-tabs" role="tablist" aria-label="Guide sections">
+            <button id="guide-play-tab" class="is-active" role="tab" aria-selected="true" aria-controls="guide-play" type="button">Play</button>
+            <button id="guide-world-tab" role="tab" aria-selected="false" aria-controls="guide-world" type="button">World logic</button>
+            <button id="guide-premise-tab" role="tab" aria-selected="false" aria-controls="guide-premise" type="button">Premise</button>
+          </div>
+
+          <section id="guide-play" class="guide-panel" role="tabpanel" aria-labelledby="guide-play-tab">
+            <p class="codex-lead">Read the pressure, seat two unlike voices, choose what they will attempt, then watch the world keep the consequence.</p>
+            <ol class="play-sequence">
+              <li><b>Pressure</b><span>A gamemaster reveals a need. The clock tells you when the world will answer on its own.</span></li>
+              <li><b>Council</b><span>Seat two cultures by touching their world glyphs or roster names. No voice contains the whole.</span></li>
+              <li><b>Decide</b><span>Choose a shared minimum, protected difference, or reversible trial. Carry a scar from Memory when an old failure belongs here.</span></li>
+              <li><b>Act</b><span>The council builds. You do not place buildings; you shape participation, intent, and what must remain reversible.</span></li>
+              <li><b>Grow</b><span>A ritual, protocol, covenant, archive, shared word, or visible fracture enters the Commons and changes later questions.</span></li>
+            </ol>
+            <div class="control-legend"><span><kbd>1–7</kbd> seat voices</span><span><kbd>Enter</kbd> act</span><span><kbd>M</kbd> memory</span><span><kbd>G</kbd> gamemasters</span><span><kbd>?</kbd> guide</span></div>
+          </section>
+
+          <section id="guide-world" class="guide-panel" role="tabpanel" aria-labelledby="guide-world-tab" hidden>
+            <p class="codex-lead">This is a civilization organism, not a city builder. Councils turn social choices into civic works; works alter relationships, memory, and the questions that can be asked next.</p>
+            <dl class="premise-list">
+              <div><dt>Colored constellations</dt><dd>The seven cultures. Brightness is presence; their threads are relationships.</dd></div>
+              <div><dt>The breathing center</dt><dd>The Commons. New civic works root here and extend outward.</dd></div>
+              <div><dt>Mistake Mountain</dt><dd>Failures remain as playable terrain instead of becoming reloads.</dd></div>
+              <div><dt>Nano atelier</dt><dd>GPT-5.4 Nano can improvise council language and procedural visual direction. Validated simulation rules alone apply consequences.</dd></div>
+              <div><dt>Deep memory</dt><dd>Neon preserves civic actions and artifacts in an append-only world ledger while the active organism stays light enough to breathe forever.</dd></div>
+            </dl>
+          </section>
+
+          <section id="guide-premise" class="guide-panel" role="tabpanel" aria-labelledby="guide-premise-tab" hidden>
+            <p class="codex-lead">Civilization as we knew it optimized itself to death. Nolybab begins again—not by finding one perfect answer, but by learning how unlike truths can remain unlike and still act together.</p>
+            <p class="codex-note">There is no final victory and no reload-worthy failure. A balanced Dawn changes the rules. A collapse composts into the next epoch. The organism keeps its memory either way.</p>
+            <button id="new-seed-button" class="danger-link" type="button">Begin with a different surviving truth</button>
+          </section>
         </aside>
 
         <div id="result-toast" class="result-toast" role="status" aria-live="assertive" aria-hidden="true">
           <span id="result-kind" class="eyebrow"></span>
           <h2 id="result-title"></h2>
           <p id="result-copy"></p>
+          <p id="result-delta" class="result-delta"></p>
           <div id="result-word" class="result-word"></div>
         </div>
 
@@ -140,7 +183,7 @@
             <button id="begin-button" type="button">Begin the first breath</button>
           </div>
           <button id="continue-button" class="continue-button" type="button" hidden>Return to the living thread</button>
-          <p class="arrival-note">Your words become the seed. The five gamemasters take it from there.</p>
+          <p class="arrival-note">Your words become the seed. Eight gamemasters—including an Illustrator, Architect, and Storyweaver—take it from there.</p>
         </div>
       </section>
     </main>

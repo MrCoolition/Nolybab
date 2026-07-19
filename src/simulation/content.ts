@@ -1,6 +1,11 @@
 import type {
+  ArtGeometry,
+  ArtMotion,
+  ArtMotif,
+  CivicWorkKind,
   DirectorDefinition,
   DirectorId,
+  ProposalMode,
   QualityKey,
   QualityMap,
   VoiceDefinition,
@@ -144,6 +149,7 @@ export const DIRECTORS: readonly DirectorDefinition[] = [
     color: '#b69ad4',
     quality: 'plurality',
     mandate: 'Prevent shared language from swallowing the voices that made it.',
+    specialist: 'system',
   },
   {
     id: 'ecology',
@@ -152,6 +158,7 @@ export const DIRECTORS: readonly DirectorDefinition[] = [
     color: '#63b9a0',
     quality: 'biosphere',
     mandate: 'Make every human answer remain answerable to living systems.',
+    specialist: 'system',
   },
   {
     id: 'mirror',
@@ -160,6 +167,7 @@ export const DIRECTORS: readonly DirectorDefinition[] = [
     color: '#e6a660',
     quality: 'agency',
     mandate: 'Learn the player’s favorite answer, then reveal its shadow.',
+    specialist: 'system',
   },
   {
     id: 'archivist',
@@ -168,6 +176,7 @@ export const DIRECTORS: readonly DirectorDefinition[] = [
     color: '#dd7164',
     quality: 'reciprocity',
     mandate: 'Return unfinished failures when the present is finally able to use them.',
+    specialist: 'system',
   },
   {
     id: 'wild',
@@ -176,6 +185,34 @@ export const DIRECTORS: readonly DirectorDefinition[] = [
     color: '#e8cc70',
     quality: 'wonder',
     mandate: 'Keep Nolybab alive by introducing truths no council requested.',
+    specialist: 'system',
+  },
+  {
+    id: 'illustrator',
+    name: 'The Illustrator',
+    epithet: 'translator of consequence into form',
+    color: '#83c8d6',
+    quality: 'wonder',
+    mandate: 'Give every civic decision a visible footprint without turning meaning into decoration.',
+    specialist: 'illustration',
+  },
+  {
+    id: 'architect',
+    name: 'The Civic Architect',
+    epithet: 'keeper of reversible structure',
+    color: '#d8c5a1',
+    quality: 'coherence',
+    mandate: 'Shape councils that can act together while preserving refusal, revision, and difference.',
+    specialist: 'council',
+  },
+  {
+    id: 'storyweaver',
+    name: 'The Storyweaver',
+    epithet: 'binder of consequence across time',
+    color: '#cf91b7',
+    quality: 'reciprocity',
+    mandate: 'Keep decisions answerable to the memories and voices that gave them meaning.',
+    specialist: 'narrative',
   },
 ] as const;
 
@@ -303,6 +340,21 @@ export const DIRECTOR_THOUGHTS: Record<DirectorId, readonly string[]> = {
     'Increasing the probability of a necessary surprise.',
     'Teaching the pattern how to mutate without losing itself.',
   ],
+  illustrator: [
+    'Finding the gesture that makes a hidden consequence visible.',
+    'Giving dissent a shape that cannot be mistaken for damage.',
+    'Composing a civic footprint from relation rather than territory.',
+  ],
+  architect: [
+    'Testing whether this council can act without making agreement compulsory.',
+    'Leaving a door through which the decision can later be revised.',
+    'Measuring structure by the refusals it can safely contain.',
+  ],
+  storyweaver: [
+    'Listening for the earlier promise inside the present pressure.',
+    'Binding one new decision to the memory it must not overwrite.',
+    'Keeping the civilization legible without giving it a single narrator.',
+  ],
 };
 
 export const DIRECTOR_KNOBS: Record<DirectorId, readonly string[]> = {
@@ -311,6 +363,70 @@ export const DIRECTOR_KNOBS: Record<DirectorId, readonly string[]> = {
   mirror: ['habit resistance', 'consent friction', 'player legibility'],
   archivist: ['scar resonance', 'historical recurrence', 'lesson permeability'],
   wild: ['novelty', 'mutation rate', 'uninvited possibility'],
+  illustrator: ['visual grammar', 'symbol density', 'motion as meaning'],
+  architect: ['council permeability', 'reversibility', 'consent topology'],
+  storyweaver: ['narrative continuity', 'voice provenance', 'memory echoes'],
+};
+
+export interface CouncilFormDefinition {
+  mode: ProposalMode;
+  label: string;
+  promise: string;
+  shadow: string;
+  workKinds: readonly CivicWorkKind[];
+  supportWeights: QualityMap;
+  successModifier: number;
+  focusMultiplier: number;
+  costAmount: number;
+  motif: ArtMotif;
+  geometry: ArtGeometry;
+  motion: ArtMotion;
+}
+
+/** Three valid but incomplete ways of acting together. */
+export const COUNCIL_FORMS: Record<ProposalMode, CouncilFormDefinition> = {
+  'shared-minimum': {
+    mode: 'shared-minimum',
+    label: 'Name the shared minimum',
+    promise: 'Act on one narrow meaning without claiming that every reason is the same.',
+    shadow: 'A useful minimum can quietly become the only permitted meaning.',
+    workKinds: ['consent-protocol', 'shared-word', 'translation-braid'],
+    supportWeights: q(0.92, 0.34, 0.62, 0.42, 0.57, 0.3),
+    successModifier: 0.07,
+    focusMultiplier: 1.14,
+    costAmount: 0.018,
+    motif: 'ring',
+    geometry: 'radial',
+    motion: 'pulse',
+  },
+  'carry-difference': {
+    mode: 'carry-difference',
+    label: 'Carry the difference',
+    promise: 'Coordinate while preserving the unlike reasons, dissent, and provenance of every voice.',
+    shadow: 'Protected difference can become distance if nobody remains responsible for coordination.',
+    workKinds: ['translation-braid', 'witness-circle', 'listening-ritual'],
+    supportWeights: q(0.54, 0.96, 0.82, 0.57, 0.78, 0.68),
+    successModifier: -0.025,
+    focusMultiplier: 0.92,
+    costAmount: 0.014,
+    motif: 'braid',
+    geometry: 'braided',
+    motion: 'breathe',
+  },
+  'reversible-trial': {
+    mode: 'reversible-trial',
+    label: 'Keep the answer reversible',
+    promise: 'Try a civic practice provisionally, with an explicit path to refuse, revise, or compost it.',
+    shadow: 'Permanent provisionality can shelter the council from ever becoming accountable.',
+    workKinds: ['open-question', 'memory-practice', 'ecological-covenant'],
+    supportWeights: q(0.48, 0.7, 0.61, 0.72, 0.94, 0.91),
+    successModifier: 0.045,
+    focusMultiplier: 0.72,
+    costAmount: 0.012,
+    motif: 'threshold',
+    geometry: 'layered',
+    motion: 'ripple',
+  },
 };
 
 export const EPOCH_NAMES = [
