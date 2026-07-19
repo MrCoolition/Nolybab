@@ -1,5 +1,5 @@
 const MODEL = 'gpt-5.4-nano';
-const MAX_REQUEST_CHARS = 15_000;
+const MAX_REQUEST_CHARS = 24_000;
 const WINDOW_MS = 60_000;
 const MAX_CALLS_PER_WINDOW = 30;
 
@@ -247,7 +247,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 18_000);
+  const timeout = setTimeout(() => controller.abort(), 24_000);
   try {
     const upstream = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',

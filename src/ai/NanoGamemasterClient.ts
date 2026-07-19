@@ -238,6 +238,43 @@ function textTuple(value: unknown, length: number, maximum: number): string[] | 
   return values.every(Boolean) ? values : null;
 }
 
+function compactRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of keys) {
+    const item = source[key];
+    if (typeof item === 'string') result[key] = text(item, 150);
+    else if (typeof item === 'number' && Number.isFinite(item)) result[key] = Math.round(item * 1000) / 1000;
+    else if (typeof item === 'boolean') result[key] = item;
+    else if (Array.isArray(item)) {
+      result[key] = item.slice(0, 6).map((entry) => {
+        if (typeof entry === 'string') return text(entry, 80);
+        if (typeof entry === 'number' || typeof entry === 'boolean') return entry;
+        return compactRecord(entry, ['id', 'name', 'title', 'kind']);
+      }).filter((entry) => entry !== null && entry !== '');
+    } else if (item && typeof item === 'object') {
+      const nested = compactRecord(item, ['id', 'name', 'title', 'kind', 'x', 'y']);
+      if (nested) result[key] = nested;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : null;
+}
+
+function compactList(value: unknown[] | undefined, limit: number, keys: readonly string[]): Record<string, unknown>[] {
+  return (value ?? []).slice(-limit).map((item) => compactRecord(item, keys)).filter((item): item is Record<string, unknown> => Boolean(item));
+}
+
+function compactAction(value: unknown): Record<string, unknown> | null {
+  const action = compactRecord(value, ['id', 'cycle', 'bornAt', 'outcome', 'summary', 'createdIds', 'sideEffects']);
+  if (!action || !value || typeof value !== 'object' || Array.isArray(value)) return action;
+  const input = compactRecord((value as Record<string, unknown>).input, [
+    'domain', 'verb', 'method', 'lead', 'ally', 'intensity', 'authoredName', 'target', 'destination',
+  ]);
+  if (input) action.input = input;
+  return action;
+}
+
 function validateCivicDirection(value: unknown): NanoCivicDirection | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
@@ -443,7 +480,7 @@ export class NanoGamemasterClient {
     const controller = new AbortController();
     this.civicControllers.set(kind, controller);
     this.setStatus('thinking');
-    const timeout = window.setTimeout(() => controller.abort(), 17_000);
+    const timeout = window.setTimeout(() => controller.abort(), 26_000);
     try {
       const response = await fetch('/api/nano-civic', {
         method: 'POST',
@@ -516,22 +553,47 @@ export class NanoGamemasterClient {
         variety: agency?.variety,
       },
       humans: {
-        arrivals: agency?.arrivals?.slice(-5),
-        settlements: agency?.settlements?.slice(-8),
+        arrivals: compactList(agency?.arrivals, 5, [
+          'id', 'name', 'kind', 'status', 'people', 'timeToArrival', 'regionId', 'revision', 'description', 'traits',
+        ]),
+        settlements: compactList(agency?.settlements, 8, [
+          'id', 'name', 'kind', 'population', 'stage', 'regionId', 'revision', 'description', 'architecture', 'material',
+        ]),
       },
       ecologyAndPlace: {
-        regions: agency?.regions?.slice(-9),
-        pressures: agency?.pressures?.slice(-6),
-        sites: agency?.sites?.slice(-10),
+        regions: compactList(agency?.regions, 9, [
+          'id', 'name', 'kind', 'vitality', 'carryingCapacity', 'water', 'soil', 'position',
+        ]),
+        pressures: compactList(agency?.pressures, 6, [
+          'id', 'title', 'kind', 'type', 'severity', 'timeToBreach', 'state', 'generation', 'regionId', 'position',
+        ]),
+        sites: compactList(agency?.sites, 10, [
+          'id', 'name', 'kind', 'status', 'maturity', 'regionId', 'revision', 'description', 'position',
+        ]),
       },
       civilization: {
-        inventions: agency?.inventions?.slice(-8),
-        laws: agency?.charterLaws?.slice(-8),
-        cultures: agency?.cultures?.slice(-8),
-        recentActions: agency?.actionHistory?.slice(-10),
+        inventions: compactList(agency?.inventions, 8, [
+          'id', 'name', 'kind', 'status', 'reliability', 'regionId', 'revision', 'description', 'principle',
+        ]),
+        laws: compactList(agency?.charterLaws, 8, [
+          'id', 'name', 'title', 'text', 'status', 'revision', 'description', 'amendments',
+        ]),
+        cultures: compactList(agency?.cultures, 8, [
+          'id', 'name', 'title', 'practice', 'status', 'revision', 'description', 'participants',
+        ]),
+        recentActions: (agency?.actionHistory ?? []).slice(-10).map(compactAction).filter(Boolean),
       },
       existingNamesDoNotRepeat: names,
-      trigger,
+      trigger: {
+        cue: text(trigger.trigger, 100),
+        selection: compactRecord(trigger.selection, [
+          'domain', 'verb', 'method', 'lead', 'ally', 'intensity', 'authoredName', 'target', 'destination',
+        ]),
+        input: compactRecord(trigger.input, [
+          'domain', 'verb', 'method', 'lead', 'ally', 'intensity', 'authoredName', 'target', 'destination',
+        ]),
+        result: compactAction(trigger.result),
+      },
     };
   }
 
