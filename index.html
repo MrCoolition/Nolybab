@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Nolybab: Reverse Babylon — an infinite civilization of plural voices, productive mistakes, and living memory."
+    />
+    <meta name="theme-color" content="#0b1210" />
+    <title>Nolybab — Reverse Babylon</title>
+  </head>
+  <body>
+    <main id="app" class="app-shell">
+      <section id="world-shell" class="world-shell" aria-label="The living civic organism of Nolybab">
+        <div id="game-canvas" class="game-canvas" role="img" aria-label="An evolving network of cultures, shared meanings, and remembered mistakes"></div>
+        <div class="atmosphere" aria-hidden="true"></div>
+
+        <header class="identity-cluster" aria-label="Civilization identity">
+          <p class="eyebrow">Reverse Babylon · living simulation</p>
+          <div class="wordmark-row">
+            <h1>Nolybab</h1>
+            <span id="breath-mark" class="breath-mark" aria-label="World is breathing"></span>
+          </div>
+          <p id="epoch-label" class="epoch-label">Seed epoch · pulse 0</p>
+        </header>
+
+        <section id="question-cluster" class="question-cluster" aria-live="polite">
+          <div class="question-origin">
+            <span id="director-sigil" class="director-sigil"></span>
+            <span id="question-origin">The Chorus is listening</span>
+            <span id="pulse-clock">∞</span>
+          </div>
+          <h2 id="question-title">The first living question is forming</h2>
+          <p id="question-situation">Every civilization begins by deciding what it is willing to hear.</p>
+          <p id="question-prompt" class="question-prompt">Choose two unlike voices.</p>
+        </section>
+
+        <aside class="civic-knot" aria-label="Civic vital signs">
+          <button id="knot-toggle" class="knot-button" aria-expanded="false" aria-controls="quality-list">
+            <span id="knot-glyph" class="knot-glyph" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </span>
+            <span>civic knot</span>
+          </button>
+          <div id="quality-list" class="quality-list"></div>
+        </aside>
+
+        <nav class="world-controls" aria-label="Simulation controls">
+          <button id="pause-button" class="glyph-button" type="button" aria-label="Pause simulation" title="Pause">Ⅱ</button>
+          <button id="speed-button" class="glyph-button speed-button" type="button" aria-label="Simulation speed" title="Change speed">1×</button>
+          <button id="sound-button" class="glyph-button" type="button" aria-label="Enable generative sound" title="Sound">◌</button>
+        </nav>
+
+        <div id="onboarding-nudge" class="onboarding-nudge">
+          <span>01 · listen</span>
+          Touch two distant voices. Difference is the instrument.
+        </div>
+
+        <section id="voice-dock" class="voice-dock" aria-label="Selected voices">
+          <div class="selection-copy">
+            <span class="dock-label">Council thread</span>
+            <div id="selected-voices" class="selected-voices">
+              <span class="empty-selection">No voices held</span>
+            </div>
+            <button id="lesson-chip" class="lesson-chip" type="button" hidden></button>
+          </div>
+          <button id="weave-button" class="weave-button" type="button" disabled>
+            <span>Weave these truths</span>
+            <small>Enter</small>
+          </button>
+        </section>
+
+        <nav class="edge-rail" aria-label="Nolybab records and systems">
+          <button id="memory-button" class="rail-button" type="button" aria-expanded="false" aria-controls="memory-drawer">
+            <span>Memory</span><b id="memory-count">0</b>
+          </button>
+          <button id="directors-button" class="rail-button" type="button" aria-expanded="false" aria-controls="directors-drawer">
+            <span>Gamemasters</span><b id="active-director-count">5</b>
+          </button>
+          <button id="codex-button" class="rail-button" type="button" aria-expanded="false" aria-controls="codex-drawer">
+            <span>Premise</span><b>?</b>
+          </button>
+        </nav>
+
+        <aside id="memory-drawer" class="side-drawer" aria-hidden="true">
+          <div class="drawer-heading">
+            <div><span class="eyebrow">Nothing is erased</span><h2>Memory thread</h2></div>
+            <button class="drawer-close" data-close="memory-drawer" aria-label="Close memory">×</button>
+          </div>
+          <p class="drawer-intro">Mistakes become playable terrain. Choose an unresolved scar to bring its lesson into the current question.</p>
+          <div id="lesson-list" class="lesson-list"></div>
+          <div id="history-list" class="history-list"></div>
+        </aside>
+
+        <aside id="directors-drawer" class="side-drawer" aria-hidden="true">
+          <div class="drawer-heading">
+            <div><span class="eyebrow">Always at the knobs</span><h2>Internal gamemasters</h2></div>
+            <button class="drawer-close" data-close="directors-drawer" aria-label="Close gamemasters">×</button>
+          </div>
+          <p class="drawer-intro">Five adaptive minds read the same civilization differently. Their influence changes continuously; none is allowed to rule alone.</p>
+          <div id="director-list" class="director-list"></div>
+          <div id="knob-list" class="knob-list"></div>
+        </aside>
+
+        <aside id="codex-drawer" class="side-drawer codex-drawer" aria-hidden="true">
+          <div class="drawer-heading">
+            <div><span class="eyebrow">The reverse tower</span><h2>What Nolybab is</h2></div>
+            <button class="drawer-close" data-close="codex-drawer" aria-label="Close premise">×</button>
+          </div>
+          <p class="codex-lead">Civilization as we knew it optimized itself to death. Nolybab begins again—not by finding one perfect answer, but by learning how unlike truths can remain unlike and still act together.</p>
+          <dl class="premise-list">
+            <div><dt>Listen</dt><dd>Read a voice on its own terms.</dd></div>
+            <div><dt>Weave</dt><dd>Make two incomplete truths answer the same living question.</dd></div>
+            <div><dt>Challenge</dt><dd>Interrupt any voice—including the helpful system—when it becomes absolute.</dd></div>
+            <div><dt>Reframe</dt><dd>Bring a remembered mistake forward as a new civic sense.</dd></div>
+          </dl>
+          <p class="codex-note">There is no final victory and no reload-worthy failure. A balanced Dawn changes the rules. A collapse composts into the next epoch. The organism keeps its memory either way.</p>
+          <button id="new-seed-button" class="danger-link" type="button">Begin with a different surviving truth</button>
+        </aside>
+
+        <div id="result-toast" class="result-toast" role="status" aria-live="assertive" aria-hidden="true">
+          <span id="result-kind" class="eyebrow"></span>
+          <h2 id="result-title"></h2>
+          <p id="result-copy"></p>
+          <div id="result-word" class="result-word"></div>
+        </div>
+
+        <div id="hover-note" class="hover-note" aria-hidden="true"></div>
+      </section>
+
+      <section id="arrival" class="arrival" aria-labelledby="arrival-title">
+        <div class="arrival-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="arrival-copy">
+          <p class="eyebrow">A civilization after certainty</p>
+          <h2 id="arrival-title">The old world optimized itself to death.</h2>
+          <label for="seed-phrase">What must survive?</label>
+          <div class="seed-entry">
+            <input id="seed-phrase" maxlength="48" autocomplete="off" placeholder="a promise, a practice, a stubborn truth…" />
+            <button id="begin-button" type="button">Begin the first breath</button>
+          </div>
+          <button id="continue-button" class="continue-button" type="button" hidden>Return to the living thread</button>
+          <p class="arrival-note">Your words become the seed. The five gamemasters take it from there.</p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
