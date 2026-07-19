@@ -1,4 +1,4 @@
-import { getReadyNeonSql } from './lib/neon';
+import { getReadyNeonSql } from './lib/neon.js';
 
 const MAX_REQUEST_BYTES = 256 * 1024;
 const MAX_SNAPSHOT_BYTES = 192 * 1024;
