@@ -137,7 +137,20 @@ const CIVIC_MOTIONS = new Set<NanoCivicDirection['visualDirection']['motion']>([
 ]);
 
 function text(value: unknown, maximum: number): string {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, maximum) : '';
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(/\s+/g, ' ').trim();
+  if (cleaned.length <= maximum) return cleaned;
+  const clipped = cleaned.slice(0, maximum + 1);
+  const sentenceEnd = Math.max(
+    clipped.lastIndexOf('.'),
+    clipped.lastIndexOf('!'),
+    clipped.lastIndexOf('?'),
+    clipped.lastIndexOf('…'),
+  );
+  if (sentenceEnd >= maximum * 0.55) return clipped.slice(0, sentenceEnd + 1).trim();
+  const wordEnd = clipped.lastIndexOf(' ', maximum - 1);
+  const boundary = wordEnd >= maximum * 0.45 ? wordEnd : maximum;
+  return `${clipped.slice(0, boundary).replace(/[\s,;:\-]+$/g, '')}…`;
 }
 
 function validateDirection(value: unknown): NanoCouncilDirection | null {
