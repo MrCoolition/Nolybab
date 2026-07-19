@@ -17,6 +17,14 @@ import {
   proposalHasConsent,
   stepGamemasters,
 } from './gamemasters';
+import {
+  createInitialAgency,
+  getActionAffordances as actionAffordances,
+  normalizeAgencyState,
+  performCivicAction as resolvePlayerAction,
+  previewCivicAction as previewPlayerAction,
+  stepAgencyWorld,
+} from './agency';
 import { clamp, hashString, lerp, mean, normalizedDifference, SeededRandom } from './random';
 import { QUALITY_KEYS } from './types';
 import type {
@@ -24,6 +32,11 @@ import type {
   ArtMotion,
   ArtMotif,
   CivicProposal,
+  CivicActionAffordance,
+  CivicActionInput,
+  CivicActionPreview,
+  CivicActionResult,
+  CivicTargetRef,
   CivicWork,
   CivicWorkKind,
   CouncilSession,
@@ -32,6 +45,8 @@ import type {
   Lesson,
   MemoryEntry,
   NanoCouncilDirection,
+  NanoArrivalDirection,
+  NanoCivicDirection,
   PersistedSimulation,
   ProceduralArtDirection,
   ProposalMode,
@@ -41,6 +56,7 @@ import type {
   SharedWord,
   SimulationSnapshot,
   SimulationState,
+  SpatialPoint,
   VoiceId,
   VoiceState,
   WeaveOutcome,
@@ -58,6 +74,7 @@ const GROWTH_SECONDS = 5.2;
 
 type SnapshotListener = (snapshot: SimulationSnapshot) => void;
 type OutcomeListener = (outcome: WeaveOutcome) => void;
+type CivicActionListener = (result: CivicActionResult) => void;
 
 const REFRAME_HOOKS: Record<QualityKey, readonly { title: string; text: string }[]> = {
   coherence: [
@@ -205,6 +222,7 @@ export class NolybabSimulation {
   private rng: SeededRandom;
   private snapshotListeners = new Set<SnapshotListener>();
   private outcomeListeners = new Set<OutcomeListener>();
+  private civicActionListeners = new Set<CivicActionListener>();
   private emitAccumulator = 0;
   private saveAccumulator = 0;
   private directorAccumulator = 0;
@@ -259,6 +277,11 @@ export class NolybabSimulation {
     return () => this.outcomeListeners.delete(listener);
   }
 
+  onCivicAction(listener: CivicActionListener): () => void {
+    this.civicActionListeners.add(listener);
+    return () => this.civicActionListeners.delete(listener);
+  }
+
   reseed(seedPhrase: string): void {
     const cleanPhrase = this.cleanSeedPhrase(seedPhrase);
     const seed = hashString(`${cleanPhrase.toLowerCase()}::reverse-babylon`);
@@ -286,6 +309,9 @@ export class NolybabSimulation {
       this.directorAccumulator -= DIRECTOR_STEP_SECONDS;
       stepGamemasters(this.state, this.rng);
       this.stepCivicDrift();
+      for (const event of stepAgencyWorld(this.state, this.rng, DIRECTOR_STEP_SECONDS)) {
+        this.addMemory(event.kind === 'breach' ? 'mistake' : 'birth', event.title, event.detail);
+      }
       this.syncRandomState();
     }
 
@@ -334,6 +360,89 @@ export class NolybabSimulation {
     this.save();
     this.emit();
     return true;
+  }
+
+  /** Truthful action availability for a spatial target. No narrative model is consulted. */
+  getActionAffordances(target?: CivicTargetRef): CivicActionAffordance[] {
+    return actionAffordances(this.state, target);
+  }
+
+  /** Deterministic preview: same state + same input always exposes the same costs and odds. */
+  previewCivicAction(input: CivicActionInput): CivicActionPreview {
+    return previewPlayerAction(this.state, input);
+  }
+
+  /**
+   * Executes a player-authored verb/domain/method/target composition. This is
+   * the primary game action; councils remain as a backwards-compatible path.
+   */
+  performCivicAction(input: CivicActionInput): CivicActionResult | null {
+    if (this.state.civicPhase === 'action' || this.state.civicPhase === 'growth') return null;
+    const result = resolvePlayerAction(this.state, input, this.rng);
+    if (!result) return null;
+
+    this.state.council = null;
+    this.state.currentQuestion = null;
+    this.state.civicPhase = 'action';
+    this.state.actionSeconds = ACTION_SECONDS;
+    this.state.interludeSeconds = ACTION_SECONDS;
+    this.state.cycle += 1;
+    this.state.resolvedQuestions += 1;
+    this.state.lastPair = input.ally ? [input.lead, input.ally] : this.state.lastPair;
+    const heard = [input.lead, input.ally].filter(Boolean) as VoiceId[];
+    for (const voiceId of heard) {
+      const voice = this.state.voices.find((candidate) => candidate.id === voiceId);
+      if (!voice) continue;
+      voice.attention += 0.58 / heard.length;
+      voice.lastHeard = this.state.elapsed;
+      voice.mutations += 1;
+    }
+    this.addMemory(
+      result.outcome === 'ruptured' ? 'mistake' : 'birth',
+      result.summary,
+      `${input.verb} was authored at ${result.input.target.kind}:${result.input.target.id}. ${result.sideEffects[0] ?? 'The world carries the consequence forward.'}`,
+    );
+    this.checkEpochTransition();
+    this.syncRandomState();
+    this.save();
+    this.emit();
+    for (const listener of this.civicActionListeners) listener(result);
+    return result;
+  }
+
+  /** Spend attention to stop an expiring autonomous council and reopen authorship. */
+  interruptAutonomy(targetPressureId: string): boolean {
+    const pressure = this.state.agency.pressures.find((candidate) => candidate.id === targetPressureId);
+    if (!pressure || pressure.state === 'transformed' || this.state.agency.resources.attention < 4) return false;
+    this.state.agency.resources.attention -= 4;
+    pressure.timeToBreach += 14;
+    pressure.severity = clamp(pressure.severity - 0.025);
+    if (this.state.council?.autonomous) {
+      this.state.council = null;
+      this.state.civicPhase = 'pressure';
+      if (this.state.currentQuestion) this.state.currentQuestion.secondsLeft = Math.max(24, this.state.currentQuestion.secondsLeft);
+    }
+    this.state.qualities.agency = clamp(this.state.qualities.agency + 0.012);
+    this.addMemory('birth', 'Autonomy was interrupted', `The player reopened ${pressure.title} before the world could choose by default.`);
+    this.save();
+    this.emit();
+    return true;
+  }
+
+  reshapePressure(
+    pressureId: string,
+    destination: SpatialPoint,
+    lead: VoiceId,
+  ): CivicActionResult | null {
+    return this.performCivicAction({
+      domain: 'habitat',
+      verb: 'reroute',
+      method: 'prototype',
+      target: { kind: 'pressure', id: pressureId },
+      lead,
+      intensity: 2,
+      destination,
+    });
   }
 
   conveneCouncil(voices: [VoiceId, VoiceId], lessonId?: string, autonomous = false): CouncilSession | null {
@@ -503,6 +612,97 @@ export class NolybabSimulation {
     return true;
   }
 
+  /**
+   * Applies expression-only AI enrichment to an artifact created by a player
+   * action. The action ID, artifact ID and revision must all match; mechanics,
+   * resources, outcomes and pressure deltas cannot be changed by the model.
+   */
+  applyNanoCivicDirection(actionId: string, direction: NanoCivicDirection): boolean {
+    if (!direction || typeof direction !== 'object') return false;
+    if (direction.model && direction.model !== 'gpt-5.4-nano') return false;
+    if (direction.actionId !== actionId || !Number.isInteger(direction.baseRevision) || direction.baseRevision < 0) return false;
+    const record = this.state.agency.actionHistory.find((candidate) => candidate.id === actionId);
+    if (!record || !record.createdIds.includes(direction.artifactId)) return false;
+
+    const artifact = [
+      ...this.state.agency.settlements,
+      ...this.state.agency.inventions,
+      ...this.state.agency.charterLaws,
+      ...this.state.agency.cultures,
+      ...this.state.agency.sites,
+      ...this.state.agency.arrivals,
+    ].find((candidate) => candidate.id === direction.artifactId);
+    if (!artifact || artifact.originActionId !== actionId || artifact.revision !== direction.baseRevision) return false;
+
+    const name = direction.name === undefined ? undefined : safeText(direction.name, 72);
+    const description = direction.description === undefined ? undefined : safeText(direction.description, 360);
+    const worldLine = direction.worldLine === undefined ? undefined : safeText(direction.worldLine, 260);
+    const visualDirection = direction.visualDirection === undefined
+      ? undefined
+      : safeArt(direction.visualDirection, artifact.visualDirection);
+    if (
+      (direction.name !== undefined && !name) ||
+      (direction.description !== undefined && !description) ||
+      (direction.worldLine !== undefined && !worldLine) ||
+      (direction.visualDirection !== undefined && !visualDirection) ||
+      (name === undefined && description === undefined && worldLine === undefined && visualDirection === undefined)
+    ) return false;
+
+    if (name) {
+      if ('name' in artifact) artifact.name = name;
+      else artifact.title = name;
+    }
+    if (description) artifact.description = description;
+    if (visualDirection) artifact.visualDirection = visualDirection;
+    artifact.source = 'nano-enriched';
+    artifact.revision += 1;
+    if (worldLine) this.state.agency.nanoWorldLines[actionId] = worldLine;
+    this.addMemory(
+      'synthesis',
+      `${'name' in artifact ? artifact.name : artifact.title} found a visual language`,
+      worldLine ?? description ?? 'The Illustrator made the player-authored consequence more legible without altering its mechanics.',
+    );
+    this.save();
+    this.emit();
+    return true;
+  }
+
+  /** Revision-guarded AI naming and illustration for an arrival already generated by the world. */
+  applyNanoArrivalDirection(arrivalId: string, baseRevision: number, direction: NanoArrivalDirection): boolean {
+    if (!direction || typeof direction !== 'object' || !Number.isInteger(baseRevision) || baseRevision < 0) return false;
+    if (direction.model && direction.model !== 'gpt-5.4-nano') return false;
+    const arrival = this.state.agency.arrivals.find((candidate) => candidate.id === arrivalId);
+    if (!arrival || arrival.revision !== baseRevision) return false;
+    const name = direction.name === undefined ? undefined : safeText(direction.name, 72);
+    const description = direction.description === undefined ? undefined : safeText(direction.description, 360);
+    const traits = direction.traits === undefined
+      ? undefined
+      : Array.isArray(direction.traits) && direction.traits.length <= 8
+        ? direction.traits.map((trait) => safeText(trait, 32))
+        : null;
+    const visualDirection = direction.visualDirection === undefined
+      ? undefined
+      : safeArt(direction.visualDirection, arrival.visualDirection);
+    if (
+      (direction.name !== undefined && !name) ||
+      (direction.description !== undefined && !description) ||
+      (direction.traits !== undefined && (!traits || traits.some((trait) => !trait))) ||
+      (direction.visualDirection !== undefined && !visualDirection) ||
+      (!name && !description && !traits && !visualDirection)
+    ) return false;
+
+    if (name) arrival.name = name;
+    if (description) arrival.description = description;
+    if (traits) arrival.traits = [...new Set([...arrival.traits, ...(traits as string[])])].slice(-12);
+    if (visualDirection) arrival.visualDirection = visualDirection;
+    arrival.source = 'nano-enriched';
+    arrival.revision += 1;
+    this.addMemory('birth', `${arrival.name} became legible at the horizon`, arrival.description);
+    this.save();
+    this.emit();
+    return true;
+  }
+
   /** Backward-compatible one-step weave used by the existing HUD. */
   weave(voices: [VoiceId, VoiceId], lessonId?: string, autonomous = false): WeaveOutcome | null {
     if (this.state.civicPhase !== 'pressure') return null;
@@ -641,6 +841,7 @@ export class NolybabSimulation {
   }
 
   private createInitialState(seedPhrase: string, seed: number): SimulationState {
+    const agency = createInitialAgency({ elapsed: 0, seedPhrase }, this.rng);
     const state: SimulationState = {
       version: 1,
       seedPhrase,
@@ -678,6 +879,7 @@ export class NolybabSimulation {
       autonomousResponses: 0,
       coerciveAutonomousResponses: 0,
       lastPair: null,
+      agency,
     };
     this.state = state;
     this.addMemory('birth', `“${seedPhrase}” survived`, 'Seven partial truths gather around an empty center. No voice is asked to become the whole.');
@@ -697,6 +899,7 @@ export class NolybabSimulation {
       : 0;
     this.state.actionSeconds = Number.isFinite(this.state.actionSeconds) ? Math.max(0, this.state.actionSeconds) : 0;
     this.state.coerciveAutonomousResponses = this.state.coerciveAutonomousResponses ?? 0;
+    normalizeAgencyState(this.state, this.rng);
 
     // Version-one saves from before councils used `interludeSeconds` as their
     // only post-decision clock. Preserve that breath instead of immediately

@@ -6,11 +6,20 @@ import { DIRECTOR_BY_ID, QUALITY_META, VOICES, VOICE_BY_ID } from '../simulation
 import type { NolybabSimulation } from '../simulation/NolybabSimulation';
 import { QUALITY_KEYS } from '../simulation/types';
 import type {
+  CivicActionAffordance,
+  CivicActionInput,
+  CivicActionPreview,
+  CivicActionResult,
+  CivicDomain,
+  CivicMethod,
   CivicPhase,
   CivicProposal,
+  CivicTargetRef,
+  CivicVerb,
   DirectorId,
   ProposalMode,
   SimulationSnapshot,
+  SpatialPoint,
   VoiceId,
   WeaveOutcome,
 } from '../simulation/types';
@@ -44,7 +53,52 @@ function workLabel(kind: string): string {
   return kind.replaceAll('-', ' ');
 }
 
+const DOMAIN_META: Record<CivicDomain, { label: string; creates: string; color: string }> = {
+  law: { label: 'Law', creates: 'a contestable living law', color: '#efc45a' },
+  culture: { label: 'Culture', creates: 'a practice people can mutate', color: '#b997d8' },
+  invention: { label: 'Invention', creates: 'a working civic invention', color: '#69b8e8' },
+  habitat: { label: 'Build', creates: 'a settlement or shared site', color: '#91b66b' },
+};
+
+const VERB_LABELS: Record<CivicVerb, string> = {
+  seed: 'Seed',
+  bind: 'Bind',
+  shelter: 'Shelter',
+  translate: 'Translate',
+  reroute: 'Reroute',
+  invite: 'Invite',
+  amend: 'Amend',
+  compost: 'Compost',
+  refuse: 'Refuse',
+};
+
+const DEFAULT_VERBS: CivicVerb[] = ['seed', 'bind', 'shelter', 'translate', 'reroute', 'invite', 'amend', 'compost', 'refuse'];
+
+function targetKey(target: CivicTargetRef): string {
+  return `${target.kind}:${target.id}${target.secondaryId ? `:${target.secondaryId}` : ''}`;
+}
+
+function formatResourceCost(cost: { attention: number; trust: number; vitality: number; possibility: number }): string {
+  const labels = [
+    ['attention', cost.attention],
+    ['trust', cost.trust],
+    ['vitality', cost.vitality],
+    ['possibility', cost.possibility],
+  ] as const;
+  const used = labels.filter(([, value]) => value > 0.001);
+  return used.length ? used.map(([label, value]) => `${Math.ceil(value)} ${label}`).join(' · ') : 'no immediate resource cost';
+}
+
+function finitePoint(value: unknown): SpatialPoint | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const point = value as { x?: unknown; y?: unknown };
+  return typeof point.x === 'number' && Number.isFinite(point.x) && typeof point.y === 'number' && Number.isFinite(point.y)
+    ? { x: point.x, y: point.y }
+    : undefined;
+}
+
 const PHASES: CivicPhase[] = ['pressure', 'council', 'decision', 'action', 'growth'];
+type CommandTargetOption = { target: CivicTargetRef; label: string; meta: string; urgent?: boolean };
 
 export class NolybabHud {
   private readonly simulation: NolybabSimulation;
@@ -62,6 +116,19 @@ export class NolybabHud {
   private lastNanoQuestionId: string | null = null;
   private hasEntered = false;
   private nanoState: NanoStatus = 'quiet';
+  private selectedDomain: CivicDomain = 'law';
+  private selectedVerb: CivicVerb = 'seed';
+  private selectedMethod: CivicMethod = 'prototype';
+  private selectedIntensity: 1 | 2 | 3 = 2;
+  private selectedTarget: CivicTargetRef | null = null;
+  private targetRefs = new Map<string, CivicTargetRef>();
+  private actionAffordances: CivicActionAffordance[] = [];
+  private actionPreview: CivicActionPreview | null = null;
+  private lastAgencyKey = '';
+  private reshapeArmed = false;
+  private foreseeTimer = 0;
+  private lastForeseeKey = '';
+  private nanoForecast: Record<string, unknown> | null = null;
 
   private readonly arrival = must<HTMLElement>('arrival');
   private readonly seedInput = must<HTMLInputElement>('seed-phrase');
@@ -83,6 +150,20 @@ export class NolybabHud {
   private readonly voiceRoster = must<HTMLElement>('voice-roster');
   private readonly proposalList = must<HTMLElement>('proposal-list');
   private readonly weaveButton = must<HTMLButtonElement>('weave-button');
+  private readonly commandDomain = must<HTMLElement>('command-domain');
+  private readonly commandTargets = must<HTMLElement>('command-targets');
+  private readonly commandVerbs = must<HTMLElement>('command-verbs');
+  private readonly commandMethod = must<HTMLSelectElement>('command-method');
+  private readonly commandIntensity = must<HTMLElement>('command-intensity');
+  private readonly actionName = must<HTMLInputElement>('action-name');
+  private readonly interruptButton = must<HTMLButtonElement>('interrupt-button');
+  private readonly reshapeButton = must<HTMLButtonElement>('reshape-button');
+  private readonly previewTarget = must<HTMLElement>('preview-target');
+  private readonly previewTitle = must<HTMLElement>('preview-title');
+  private readonly previewCreates = must<HTMLElement>('preview-creates');
+  private readonly previewChanges = must<HTMLElement>('preview-changes');
+  private readonly previewRisk = must<HTMLElement>('preview-risk');
+  private readonly commandFeedback = must<HTMLElement>('command-feedback');
   private readonly lessonChip = must<HTMLButtonElement>('lesson-chip');
   private readonly nanoStatus = must<HTMLElement>('nano-status');
   private readonly aiDisclosure = must<HTMLElement>('ai-disclosure');
@@ -135,10 +216,9 @@ export class NolybabHud {
       this.lastCivicPhase = snapshot.civicPhase;
       this.latestSnapshot = snapshot;
       if (enteredNewPressure) {
-        this.selectedVoices = [];
-        this.selectedLessonId = null;
-        this.scene.setSelectedVoices([]);
-        this.scene.setSelectedLesson(null);
+        if (this.selectedTarget?.kind === 'pressure') this.selectedTarget = null;
+        this.nanoForecast = null;
+        this.lastForeseeKey = '';
       }
       this.syncCouncilSelection(snapshot);
       this.render(snapshot);
@@ -146,9 +226,7 @@ export class NolybabHud {
       this.maybeEnrichCouncil(snapshot);
     });
     simulation.onOutcome((outcome) => {
-      this.selectedVoices = [];
       this.selectedLessonId = null;
-      this.scene.setSelectedVoices([]);
       this.scene.setSelectedLesson(null);
       this.scene.playOutcome(outcome);
       this.soundscape.outcome(outcome);
@@ -160,6 +238,17 @@ export class NolybabHud {
     this.scene.onVoiceSelected = (voice) => this.toggleVoice(voice);
     this.scene.onLessonSelected = (lessonId) => this.selectLesson(lessonId);
     this.scene.onHoverVoice = (voice, point) => this.showVoiceHover(voice, point);
+    this.scene.onCivicTargetSelected = (target) => {
+      if (this.reshapeArmed) this.commitReshape(target);
+      else {
+        this.selectedTarget = target;
+        this.scene.setSelectedCivicTarget(target);
+        this.nanoForecast = null;
+        this.lastForeseeKey = '';
+        this.renderAgency(this.latestSnapshot, true);
+      }
+    };
+    this.scene.onHoverCivicTarget = (target, point) => this.showCivicTargetHover(target, point);
   }
 
   private bindControls(): void {
@@ -168,7 +257,56 @@ export class NolybabHud {
     this.seedInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') void this.beginNewWorld();
     });
-    this.weaveButton.addEventListener('click', () => this.advanceCouncil());
+    this.weaveButton.addEventListener('click', () => this.executeCommand());
+    this.commandDomain.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-domain]');
+      const domain = button?.dataset.domain as CivicDomain | undefined;
+      if (!domain || !(domain in DOMAIN_META)) return;
+      this.selectedDomain = domain;
+      this.nanoForecast = null;
+      this.lastForeseeKey = '';
+      this.renderAgency(this.latestSnapshot, true);
+    });
+    this.commandTargets.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-target-key]');
+      const target = button?.dataset.targetKey ? this.targetRefs.get(button.dataset.targetKey) : undefined;
+      if (!target) return;
+      if (this.reshapeArmed) {
+        this.commitReshape(target);
+        return;
+      }
+      this.selectedTarget = target;
+      this.scene.setSelectedCivicTarget(target);
+      this.nanoForecast = null;
+      this.lastForeseeKey = '';
+      this.renderAgency(this.latestSnapshot, true);
+    });
+    this.commandVerbs.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-verb]');
+      const verb = button?.dataset.verb as CivicVerb | undefined;
+      if (!verb || !DEFAULT_VERBS.includes(verb) || button?.disabled) return;
+      this.selectedVerb = verb;
+      this.nanoForecast = null;
+      this.lastForeseeKey = '';
+      this.renderAgency(this.latestSnapshot, true);
+    });
+    this.commandMethod.addEventListener('change', () => {
+      this.selectedMethod = this.commandMethod.value as CivicMethod;
+      this.nanoForecast = null;
+      this.lastForeseeKey = '';
+      this.renderAgency(this.latestSnapshot, true);
+    });
+    this.commandIntensity.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-intensity]');
+      const intensity = Number(button?.dataset.intensity);
+      if (intensity !== 1 && intensity !== 2 && intensity !== 3) return;
+      this.selectedIntensity = intensity;
+      this.renderAgency(this.latestSnapshot, true);
+    });
+    this.actionName.addEventListener('input', () => this.renderAgency(this.latestSnapshot, true));
+    this.interruptButton.addEventListener('click', () => this.interruptWorld());
+    this.reshapeButton.addEventListener('click', () => this.toggleReshape());
+    window.addEventListener('nolybab:nano-response', (event) => this.receiveNanoResponse(event));
     this.lessonChip.addEventListener('click', () => this.selectLesson(this.selectedLessonId ?? ''));
     this.selectedVoicesElement.addEventListener('click', (event) => {
       const target = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-selected-voice]');
@@ -303,6 +441,10 @@ export class NolybabHud {
     }
     this.nano.cancel();
     this.lastNanoQuestionId = null;
+    this.selectedTarget = null;
+    this.scene.setSelectedCivicTarget(null);
+    this.nanoForecast = null;
+    this.lastForeseeKey = '';
     this.simulation.reseed(phrase);
     this.releaseLocalSelection();
     await this.enterWorld();
@@ -312,17 +454,15 @@ export class NolybabHud {
     this.hasEntered = true;
     this.arrival.classList.add('is-gone');
     this.simulation.setPaused(false);
+    window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
+      detail: { kind: 'arrival', snapshot: this.simulation.snapshot },
+    }));
     const enabled = await this.soundscape.setEnabled(true);
     this.renderSoundButton(enabled);
     window.setTimeout(() => this.arrival.setAttribute('aria-hidden', 'true'), 900);
   }
 
   private toggleVoice(voice: VoiceId): void {
-    if (!this.latestSnapshot.currentQuestion) return;
-    if (this.latestSnapshot.civicPhase !== 'pressure') {
-      if (this.latestSnapshot.civicPhase === 'council' || this.latestSnapshot.civicPhase === 'decision') this.releaseCouncil();
-      else return;
-    }
     const existing = this.selectedVoices.indexOf(voice);
     if (existing >= 0) this.selectedVoices.splice(existing, 1);
     else if (this.selectedVoices.length < 2) this.selectedVoices.push(voice);
@@ -331,7 +471,9 @@ export class NolybabHud {
     this.scene.setSelectedVoices(this.selectedVoices);
     this.soundscape.voice(voice);
     this.renderSelection(this.latestSnapshot);
-    if (this.selectedVoices.length === 2) this.conveneSelected();
+    this.nanoForecast = null;
+    this.lastForeseeKey = '';
+    this.renderAgency(this.latestSnapshot, true);
   }
 
   private conveneSelected(): void {
@@ -356,7 +498,7 @@ export class NolybabHud {
   }
 
   private selectLesson(lessonId: string): void {
-    if (this.latestSnapshot.civicPhase !== 'pressure') return;
+    if (this.latestSnapshot.civicPhase === 'action' || this.latestSnapshot.civicPhase === 'growth') return;
     const lesson = this.latestSnapshot.lessons.find((candidate) => candidate.id === lessonId && !candidate.resolved);
     this.selectedLessonId = lesson && this.selectedLessonId !== lessonId ? lessonId : null;
     this.scene.setSelectedLesson(this.selectedLessonId);
@@ -375,6 +517,154 @@ export class NolybabHud {
     this.simulation.enactCouncil();
   }
 
+  private buildActionInput(target = this.selectedTarget): CivicActionInput | null {
+    const lead = this.selectedVoices[0];
+    if (!lead || !target) return null;
+    const authoredName = this.actionName.value.trim();
+    return {
+      domain: this.selectedDomain,
+      verb: this.selectedVerb,
+      method: this.selectedMethod,
+      target,
+      lead,
+      ally: this.selectedVoices[1],
+      intensity: this.selectedIntensity,
+      lessonId: this.selectedLessonId ?? undefined,
+      authoredName: authoredName || undefined,
+      destination: this.selectedDomain === 'habitat' ? target.position : undefined,
+    };
+  }
+
+  private executeCommand(): void {
+    if (this.reshapeArmed) {
+      this.setCommandFeedback('Choose a destination in the Target lane, or cancel Reshape.');
+      return;
+    }
+    const input = this.buildActionInput();
+    if (!input) {
+      this.setCommandFeedback(this.selectedVoices[0] ? 'Choose where this action should land.' : 'Choose a lead culture first.');
+      return;
+    }
+    const preview = this.simulation.previewCivicAction(input);
+    if (!preview.valid) {
+      this.setCommandFeedback(preview.errors[0] ?? 'That action is not possible here yet.');
+      this.renderAgency(this.latestSnapshot, true);
+      return;
+    }
+    const result = this.simulation.performCivicAction(input);
+    if (!result) {
+      this.setCommandFeedback('The world is physically changing. Hold it for a breath, then act again.');
+      return;
+    }
+    this.actionName.value = '';
+    this.nanoForecast = null;
+    this.lastForeseeKey = '';
+    this.setCommandFeedback(result.summary, 'success');
+    window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
+      detail: { kind: 'consequence', snapshot: this.simulation.snapshot, input, result },
+    }));
+    this.renderAgency(this.simulation.snapshot, true);
+  }
+
+  private interruptWorld(): void {
+    const pressure = this.activePressure(this.latestSnapshot);
+    if (!pressure) {
+      this.setCommandFeedback('No autonomous pressure is currently moving.');
+      return;
+    }
+    const interrupted = this.simulation.interruptAutonomy(pressure.id);
+    this.setCommandFeedback(
+      interrupted ? `${pressure.title} is held. The world will wait for your move.` : 'That pressure has already crossed the threshold.',
+      interrupted ? 'success' : 'warning',
+    );
+    this.renderAgency(this.simulation.snapshot, true);
+  }
+
+  private toggleReshape(): void {
+    if (this.reshapeArmed) {
+      this.reshapeArmed = false;
+      this.reshapeButton.setAttribute('aria-pressed', 'false');
+      this.setCommandFeedback('Reshape cancelled.');
+      this.renderAgency(this.latestSnapshot, true);
+      return;
+    }
+    if (!this.selectedVoices[0]) {
+      this.setCommandFeedback('Choose the culture that will carry the pressure first.');
+      return;
+    }
+    const pressure = this.activePressure(this.latestSnapshot);
+    if (!pressure) {
+      this.setCommandFeedback('There is no live pressure to reroute.');
+      return;
+    }
+    this.reshapeArmed = true;
+    this.reshapeButton.setAttribute('aria-pressed', 'true');
+    this.setCommandFeedback(`Choose where “${pressure.title}” should move.`);
+    this.renderAgency(this.latestSnapshot, true);
+  }
+
+  private commitReshape(destination: CivicTargetRef): void {
+    const pressure = this.activePressure(this.latestSnapshot);
+    const lead = this.selectedVoices[0];
+    const point = destination.position;
+    if (!pressure || !lead || !point) {
+      this.setCommandFeedback('That destination cannot receive a pressure. Choose a region, settlement, or site.');
+      return;
+    }
+    const result = this.simulation.reshapePressure(pressure.id, point, lead);
+    if (!result) {
+      this.setCommandFeedback('The pressure resisted that route. The forecast shows what is missing.', 'warning');
+      return;
+    }
+    this.reshapeArmed = false;
+    this.reshapeButton.setAttribute('aria-pressed', 'false');
+    this.selectedTarget = destination;
+    this.setCommandFeedback(result.summary, 'success');
+    window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
+      detail: { kind: 'consequence', snapshot: this.simulation.snapshot, input: result.input, result },
+    }));
+    this.renderAgency(this.simulation.snapshot, true);
+  }
+
+  private activePressure(snapshot: SimulationSnapshot) {
+    if (this.selectedTarget?.kind === 'pressure') {
+      const selected = snapshot.agency.pressures.find((pressure) => pressure.id === this.selectedTarget?.id && pressure.state !== 'transformed');
+      if (selected) return selected;
+    }
+    return snapshot.agency.pressures
+      .filter((pressure) => pressure.state === 'active' || pressure.state === 'emerging')
+      .sort((a, b) => a.timeToBreach - b.timeToBreach || b.severity - a.severity)[0];
+  }
+
+  private setCommandFeedback(message: string, kind: 'quiet' | 'success' | 'warning' = 'quiet'): void {
+    this.commandFeedback.textContent = message;
+    this.commandFeedback.dataset.kind = kind;
+  }
+
+  private receiveNanoResponse(event: Event): void {
+    const detail = (event as CustomEvent).detail as {
+      kind?: string;
+      direction?: Record<string, unknown> | null;
+      input?: CivicActionInput;
+      result?: CivicActionResult;
+    } | undefined;
+    if (!detail?.direction || typeof detail.direction !== 'object') return;
+    if (detail.kind === 'foresee') {
+      const current = this.buildActionInput();
+      if (!current || !detail.input || targetKey(current.target) !== targetKey(detail.input.target) || current.domain !== detail.input.domain || current.lead !== detail.input.lead) return;
+      this.nanoForecast = detail.direction;
+      this.renderAgency(this.latestSnapshot, true);
+      return;
+    }
+    const worldLine = typeof detail.direction.worldLine === 'string' ? detail.direction.worldLine : '';
+    if (detail.kind === 'arrival' && worldLine) {
+      this.questionPrompt.textContent = worldLine;
+      this.setCommandFeedback(worldLine);
+    } else if (detail.kind === 'consequence' && worldLine) {
+      this.setCommandFeedback(worldLine, 'success');
+    }
+  }
+
   private maybeEnrichCouncil(snapshot: SimulationSnapshot): void {
     const council = snapshot.council;
     const question = snapshot.currentQuestion;
@@ -390,10 +680,6 @@ export class NolybabHud {
   private syncCouncilSelection(snapshot: SimulationSnapshot): void {
     const council = snapshot.council;
     if (!council || snapshot.civicPhase === 'pressure') return;
-    if (this.selectedVoices.join(':') !== council.authors.join(':')) {
-      this.selectedVoices = [...council.authors];
-      this.scene.setSelectedVoices(this.selectedVoices);
-    }
     if (council.lessonId && !this.selectedLessonId) {
       this.selectedLessonId = council.lessonId;
       this.scene.setSelectedLesson(council.lessonId);
@@ -405,6 +691,7 @@ export class NolybabHud {
     this.renderPhase(snapshot);
     this.renderQualities(snapshot);
     this.renderSelection(snapshot);
+    this.renderAgency(snapshot);
     this.renderControls(snapshot);
     this.renderMemory(snapshot);
     this.renderDirectors(snapshot);
@@ -413,6 +700,17 @@ export class NolybabHud {
   private renderQuestion(snapshot: SimulationSnapshot): void {
     const question = snapshot.currentQuestion;
     this.epochLabel.textContent = `${snapshot.epochName} epoch · pulse ${snapshot.cycle} · ${snapshot.works.length + snapshot.archivedWorkCount} civic works`;
+    const pressure = this.activePressure(snapshot);
+    if (pressure && (pressure.state === 'active' || pressure.state === 'emerging')) {
+      this.questionOrigin.textContent = `${pressure.kind} front · generation ${pressure.generation}`;
+      this.questionTitle.textContent = pressure.title;
+      this.questionSituation.textContent = pressure.detail;
+      this.questionPrompt.textContent = snapshot.agency.nanoWorldLines[pressure.id]
+        ?? 'Choose a target and author the response. The forecast updates before you commit.';
+      this.pulseClock.textContent = `${Math.max(0, Math.ceil(pressure.timeToBreach))}s to breach`;
+      this.directorSigil.style.background = QUALITY_META[pressure.focus].color;
+      return;
+    }
     if (!question) {
       const work = snapshot.council?.pendingWork ?? snapshot.works.at(-1);
       this.questionOrigin.textContent = snapshot.civicPhase === 'action' ? 'Council action · a choice becomes material' : 'Living consequence · the world remembers';
@@ -448,25 +746,11 @@ export class NolybabHud {
       step.classList.toggle('is-past', index < current);
     });
 
-    const first = this.selectedVoices[0] ? VOICE_BY_ID[this.selectedVoices[0]] : null;
-    const proposal = snapshot.council?.proposals.find((candidate) => candidate.id === snapshot.council?.selectedProposalId);
-    if (snapshot.civicPhase === 'pressure') {
-      this.stageInstruction.textContent = this.selectedVoices.length === 0
-        ? 'Seat a first voice, then a countervoice. The world will act if you do not.'
-        : this.selectedVoices.length === 1
-          ? `${first?.shortName} are seated. Choose a voice able to resist them.`
-          : 'Two voices are held. The council is opening.';
-    } else if (snapshot.civicPhase === 'council') {
-      this.stageInstruction.textContent = `${snapshot.council?.name ?? 'The council'} offers three materially different actions. Choose one.`;
-    } else if (snapshot.civicPhase === 'decision') {
-      this.stageInstruction.textContent = proposal
-        ? `Decision held: ${proposal.title}. Enact it, or choose another form.`
-        : 'The council is waiting for a decision.';
-    } else if (snapshot.civicPhase === 'action') {
-      this.stageInstruction.textContent = `The council is acting. ${snapshot.council?.pendingWork?.title ?? 'A civic work'} is becoming visible.`;
-    } else {
-      this.stageInstruction.textContent = `Witness the growth. ${snapshot.works.at(-1)?.title ?? 'The Commons'} now alters future choices.`;
-    }
+    const lead = this.selectedVoices[0] ? VOICE_BY_ID[this.selectedVoices[0]] : null;
+    if (this.reshapeArmed) this.stageInstruction.textContent = 'Reshape armed: choose the region, settlement, or site that should receive the pressure.';
+    else if (!lead) this.stageInstruction.textContent = 'Choose a lead culture. Add a second only if you want a coalition.';
+    else if (!this.selectedTarget) this.stageInstruction.textContent = `${lead.shortName} are ready. Choose where their action lands.`;
+    else this.stageInstruction.textContent = `${DOMAIN_META[this.selectedDomain].label}: ${VERB_LABELS[this.selectedVerb].toLowerCase()} through ${this.selectedMethod}. Change any part or commit now.`;
   }
 
   private renderQualities(snapshot: SimulationSnapshot): void {
@@ -481,6 +765,199 @@ export class NolybabHud {
         <b>${percent(value)}</b><em style="--quality-color:${meta.color};--quality-value:${value}"></em>
       </div>`;
     }).join('');
+  }
+
+  private renderAgency(snapshot: SimulationSnapshot, force = false): void {
+    const options = this.collectCommandTargets(snapshot, this.reshapeArmed);
+    const availableKeys = new Set(options.map((option) => targetKey(option.target)));
+    if (!this.reshapeArmed && (!this.selectedTarget || !availableKeys.has(targetKey(this.selectedTarget)))) {
+      this.selectedTarget = options[0]?.target ?? { kind: 'commons', id: 'commons' };
+      this.scene.setSelectedCivicTarget(this.selectedTarget);
+    }
+
+    const resources = snapshot.agency.resources;
+    const agencyKey = [
+      snapshot.civicPhase,
+      this.selectedDomain,
+      this.selectedVerb,
+      this.selectedMethod,
+      this.selectedIntensity,
+      this.selectedVoices.join(':'),
+      this.selectedTarget ? targetKey(this.selectedTarget) : '',
+      this.selectedLessonId ?? '',
+      this.reshapeArmed,
+      this.actionName.value,
+      resources.attention.toFixed(1),
+      resources.trust.toFixed(1),
+      resources.vitality.toFixed(1),
+      resources.possibility.toFixed(1),
+      options.map((option) => `${targetKey(option.target)}:${option.meta}`).join('|'),
+      this.nanoForecast ? JSON.stringify(this.nanoForecast) : '',
+    ].join('~');
+    if (!force && agencyKey === this.lastAgencyKey) return;
+    this.lastAgencyKey = agencyKey;
+
+    this.voiceDock.style.setProperty('--command-color', DOMAIN_META[this.selectedDomain].color);
+    this.commandDomain.querySelectorAll<HTMLButtonElement>('[data-domain]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.dataset.domain === this.selectedDomain));
+    });
+    this.commandIntensity.querySelectorAll<HTMLButtonElement>('[data-intensity]').forEach((button) => {
+      button.setAttribute('aria-pressed', String(Number(button.dataset.intensity) === this.selectedIntensity));
+    });
+    this.commandMethod.value = this.selectedMethod;
+
+    this.targetRefs.clear();
+    this.commandTargets.innerHTML = options.map((option) => {
+      const key = targetKey(option.target);
+      this.targetRefs.set(key, option.target);
+      const selected = !this.reshapeArmed && this.selectedTarget ? key === targetKey(this.selectedTarget) : false;
+      return `<button type="button" role="option" data-target-key="${escapeHtml(key)}" aria-selected="${selected}" class="${option.urgent ? 'is-urgent' : ''}"><span>${escapeHtml(option.label)}</span><small>${escapeHtml(option.meta)}</small></button>`;
+    }).join('');
+
+    const affordanceTarget = this.reshapeArmed ? undefined : this.selectedTarget ?? undefined;
+    this.actionAffordances = this.simulation.getActionAffordances(affordanceTarget);
+    const relevant = this.actionAffordances.filter((affordance) =>
+      affordance.domains.includes(this.selectedDomain)
+      && (!this.selectedTarget || affordance.targetKinds.includes(this.selectedTarget.kind)),
+    );
+    if (!relevant.some((affordance) => affordance.verb === this.selectedVerb && affordance.available)) {
+      this.selectedVerb = relevant.find((affordance) => affordance.available)?.verb ?? relevant[0]?.verb ?? this.selectedVerb;
+    }
+    this.commandVerbs.innerHTML = relevant.map((affordance) => `<button type="button" data-verb="${affordance.verb}" aria-pressed="${affordance.verb === this.selectedVerb}" ${affordance.available ? '' : 'disabled'} title="${escapeHtml(affordance.available ? affordance.description : affordance.reason ?? 'Unavailable here')}"><span>${escapeHtml(affordance.label || VERB_LABELS[affordance.verb])}</span><small>${escapeHtml(affordance.description)}</small></button>`).join('')
+      || '<span class="no-affordance">Choose another target for this kind of change.</span>';
+
+    const input = this.reshapeArmed ? null : this.buildActionInput();
+    this.actionPreview = input ? this.simulation.previewCivicAction(input) : null;
+    this.renderActionPreview(this.actionPreview, input);
+    this.renderPhase(snapshot);
+    if (input) this.requestNanoForecast(snapshot, input);
+
+    const pressure = this.activePressure(snapshot);
+    this.interruptButton.disabled = !pressure;
+    this.interruptButton.textContent = pressure ? `Interrupt · ${Math.max(0, Math.ceil(pressure.timeToBreach))}s` : 'No pressure to interrupt';
+    this.reshapeButton.disabled = !pressure || !this.selectedVoices[0];
+    this.reshapeButton.textContent = this.reshapeArmed ? 'Cancel reshape' : 'Reshape pressure';
+  }
+
+  private collectCommandTargets(snapshot: SimulationSnapshot, destinationOnly: boolean): CommandTargetOption[] {
+    const seen = new Set<string>();
+    const options: CommandTargetOption[] = [];
+    const add = (target: CivicTargetRef, label: string, meta: string, urgent = false) => {
+      const key = targetKey(target);
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ target, label, meta, urgent });
+    };
+    const agency = snapshot.agency;
+
+    if (!destinationOnly) {
+      agency.pressures
+        .filter((pressure) => pressure.state === 'active' || pressure.state === 'emerging')
+        .sort((a, b) => a.timeToBreach - b.timeToBreach || b.severity - a.severity)
+        .slice(0, 3)
+        .forEach((pressure) => add(
+          { kind: 'pressure', id: pressure.id, position: pressure.position },
+          pressure.title,
+          `${pressure.kind} · ${Math.max(0, Math.ceil(pressure.timeToBreach))}s`,
+          pressure.timeToBreach < 30 || pressure.severity > 0.7,
+        ));
+
+      if (this.selectedDomain === 'culture' || this.selectedDomain === 'habitat') {
+        agency.arrivals
+          .filter((arrival) => arrival.status === 'approaching')
+          .sort((a, b) => a.timeToArrival - b.timeToArrival)
+          .slice(0, 3)
+          .forEach((arrival) => add(
+            { kind: 'arrival', id: arrival.id, position: arrival.destination },
+            arrival.name,
+            `${arrival.kind} arriving · ${Math.max(0, Math.ceil(arrival.timeToArrival))}s`,
+            arrival.urgency > 0.7,
+          ));
+      }
+
+      if (this.selectedDomain === 'law') {
+        agency.charterLaws.slice(-3).reverse().forEach((law) => add({ kind: 'law', id: law.id, position: law.position }, law.name, `${law.amendments} amendments`));
+      } else if (this.selectedDomain === 'culture') {
+        agency.cultures.slice(-3).reverse().forEach((culture) => add({ kind: 'culture', id: culture.id, position: culture.position }, culture.name, `${Math.round(culture.adoption * 100)}% adoption`));
+      } else if (this.selectedDomain === 'invention') {
+        agency.inventions.slice(-3).reverse().forEach((invention) => add({ kind: 'invention', id: invention.id, position: invention.position }, invention.name, `${Math.round(invention.reliability * 100)}% reliable`));
+      }
+    }
+
+    agency.settlements.slice(-3).reverse().forEach((settlement) => add({ kind: 'settlement', id: settlement.id, position: settlement.position }, settlement.name, `${settlement.form.replaceAll('-', ' ')} · ${settlement.inhabitants} people`));
+    agency.sites.slice(-3).reverse().forEach((site) => add({ kind: 'site', id: site.id, position: site.position }, site.title, site.kind));
+    agency.regions.slice(0, 4).forEach((region) => add({ kind: 'region', id: region.id, position: region.position }, region.name, `${region.terrain} · ${Math.round(region.vitality * 100)}% vital`));
+    if (!destinationOnly) add({ kind: 'commons', id: 'commons' }, 'The Commons', 'whole civilization');
+
+    if (!destinationOnly && this.selectedTarget && !seen.has(targetKey(this.selectedTarget))) {
+      add(this.selectedTarget, 'Selected in the world', this.selectedTarget.kind);
+    }
+    return options.slice(0, destinationOnly ? 10 : 12);
+  }
+
+  private renderActionPreview(preview: CivicActionPreview | null, input: CivicActionInput | null): void {
+    const label = this.weaveButton.querySelector('span');
+    if (!input || !preview) {
+      this.previewTarget.textContent = this.selectedTarget?.kind.replaceAll('-', ' ') ?? 'Choose a target';
+      this.previewTitle.textContent = this.selectedVoices[0] ? 'Choose where this action lands' : 'Choose a lead culture';
+      this.previewCreates.textContent = DOMAIN_META[this.selectedDomain].creates;
+      this.previewChanges.textContent = 'your forecast will appear here';
+      this.previewRisk.textContent = 'costs are calculated before commitment';
+      this.weaveButton.disabled = true;
+      if (label) label.textContent = this.selectedVoices[0] ? 'Choose a target' : 'Choose a lead culture';
+      return;
+    }
+
+    const direction = this.nanoForecast;
+    const options = Array.isArray(direction?.options) ? direction.options as Array<Record<string, unknown>> : [];
+    const nanoOption = options.find((option) => option.domain === input.domain && option.verb === input.verb)
+      ?? options.find((option) => option.domain === input.domain);
+    const nanoTitle = typeof nanoOption?.title === 'string'
+      ? nanoOption.title
+      : typeof direction?.publicName === 'string'
+        ? direction.publicName
+        : typeof direction?.title === 'string'
+          ? direction.title
+          : '';
+    const nanoPromise = typeof nanoOption?.promise === 'string'
+      ? nanoOption.promise
+      : typeof direction?.consequence === 'string'
+        ? direction.consequence
+        : '';
+    const nanoRisk = typeof nanoOption?.risk === 'string'
+      ? nanoOption.risk
+      : typeof direction?.costNarrative === 'string'
+        ? direction.costNarrative
+        : '';
+    const deterministicCost = formatResourceCost(preview.cost);
+    const chance = `${Math.round(preview.chance * 100)}% ${preview.predicted}`;
+
+    this.previewTarget.textContent = preview.targetLabel;
+    this.previewTitle.textContent = nanoTitle || preview.summary;
+    this.previewCreates.textContent = nanoPromise || DOMAIN_META[this.selectedDomain].creates;
+    this.previewChanges.textContent = preview.consequences.slice(0, 2).join(' · ') || `${Math.round(Math.abs(preview.pressureDelta) * 100)}% pressure shift`;
+    this.previewRisk.textContent = `${deterministicCost} · ${chance}${nanoRisk ? ` · ${nanoRisk}` : ''}`;
+    this.previewTitle.closest<HTMLElement>('.command-preview')!.dataset.predicted = preview.predicted;
+    this.weaveButton.disabled = !preview.valid;
+    if (label) label.textContent = preview.valid
+      ? `${VERB_LABELS[input.verb]} ${DOMAIN_META[input.domain].label}`
+      : preview.errors[0] ?? 'Not possible yet';
+    this.weaveButton.setAttribute('aria-label', preview.valid
+      ? `${VERB_LABELS[input.verb]} ${DOMAIN_META[input.domain].label}. Cost: ${deterministicCost}. Forecast: ${chance}.`
+      : label?.textContent ?? 'Civic action unavailable');
+  }
+
+  private requestNanoForecast(snapshot: SimulationSnapshot, input: CivicActionInput): void {
+    if (!this.hasEntered) return;
+    const key = [input.domain, input.verb, input.method, targetKey(input.target), input.lead, input.ally ?? '', input.intensity].join(':');
+    if (key === this.lastForeseeKey) return;
+    this.lastForeseeKey = key;
+    window.clearTimeout(this.foreseeTimer);
+    this.foreseeTimer = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
+        detail: { kind: 'foresee', snapshot, input },
+      }));
+    }, 360);
   }
 
   private renderSelection(snapshot: SimulationSnapshot): void {
@@ -500,19 +977,19 @@ export class NolybabHud {
     this.lastSelectionKey = selectionKey;
 
     if (this.selectedVoices.length === 0) {
-      this.selectedVoicesElement.innerHTML = '<span class="empty-selection">Two voices are waiting to be heard</span>';
+      this.selectedVoicesElement.innerHTML = '<span class="empty-selection">Choose a lead culture</span>';
     } else {
       this.selectedVoicesElement.innerHTML = this.selectedVoices.map((id, index) => {
         const voice = VOICE_BY_ID[id];
         return `<button class="voice-chip" data-selected-voice="${id}" style="--voice-color:${voice.cssColor}" title="${escapeHtml(voice.lens)}">
-          <i>${index + 1}</i><span>${escapeHtml(voice.shortName)}</span><b>×</b>
+          <i>${index === 0 ? 'lead' : 'ally'}</i><span>${escapeHtml(voice.shortName)}</span><b>×</b>
         </button>`;
-      }).join('<span class="weave-join">⇄</span>');
+      }).join('<span class="weave-join">+</span>');
     }
 
     this.voiceRoster.innerHTML = VOICES.map((voice) => {
       const seat = this.selectedVoices.indexOf(voice.id);
-      return `<button class="voice-choice" data-voice-id="${voice.id}" data-seat="${seat >= 0 ? seat + 1 : ''}" aria-pressed="${seat >= 0}" style="--voice-color:${voice.cssColor}" title="${escapeHtml(voice.lens)}">${escapeHtml(voice.shortName)}</button>`;
+      return `<button class="voice-choice" data-voice-id="${voice.id}" data-seat="${seat >= 0 ? seat + 1 : ''}" aria-pressed="${seat >= 0}" style="--voice-color:${voice.cssColor}" title="${escapeHtml(`${voice.lens}. Gift: ${voice.gift}. Shadow: ${voice.shadow}.`)}"><span>${escapeHtml(voice.shortName)}</span><small>${escapeHtml(voice.verb)}</small></button>`;
     }).join('');
 
     const lesson = this.selectedLessonId
@@ -521,27 +998,8 @@ export class NolybabHud {
     this.lessonChip.hidden = !lesson;
     if (lesson) this.lessonChip.textContent = `scar carried: ${lesson.title} ×`;
 
-    const proposal = council?.proposals.find((candidate) => candidate.id === council.selectedProposalId);
-    const showProposals = Boolean(council && (snapshot.civicPhase === 'council' || snapshot.civicPhase === 'decision'));
-    this.proposalList.hidden = !showProposals;
-    if (showProposals && council) this.renderProposals(council.proposals, council.selectedProposalId, council.name, council.voicesLine);
-
+    this.proposalList.hidden = true;
     this.weaveButton.classList.toggle('has-memory', Boolean(lesson));
-    const label = this.weaveButton.querySelector('span');
-    if (snapshot.civicPhase === 'pressure') {
-      this.weaveButton.disabled = true;
-      if (label) label.textContent = this.selectedVoices.length === 0 ? 'Seat two voices' : 'Seat one more voice';
-    } else if (snapshot.civicPhase === 'council') {
-      this.weaveButton.disabled = true;
-      if (label) label.textContent = 'Choose a proposal';
-    } else if (snapshot.civicPhase === 'decision' && proposal) {
-      this.weaveButton.disabled = false;
-      if (label) label.textContent = `Enact ${proposal.title}`;
-    } else {
-      this.weaveButton.disabled = true;
-      if (label) label.textContent = snapshot.civicPhase === 'action' ? 'Council is acting' : 'World is growing';
-    }
-    this.weaveButton.setAttribute('aria-label', label?.textContent ?? 'Council action');
   }
 
   private renderProposals(proposals: CivicProposal[], selectedId: string | null, councilName: string, voicesLine?: string): void {
@@ -574,9 +1032,9 @@ export class NolybabHud {
 
   private renderNanoStatus(): void {
     const copy: Record<NanoStatus, { short: string; long: string }> = {
-      quiet: { short: 'Nano atelier', long: 'Procedural atelier is awake. Nano joins each council from the server.' },
-      thinking: { short: 'Nano is sketching', long: 'GPT-5.4 Nano is convening the Illustrator, Architect, and Storyweaver.' },
-      connected: { short: 'Nano breathing', long: 'GPT-5.4 Nano enriched the current council. Deterministic rules still govern consent and consequence.' },
+      quiet: { short: 'Nano atelier', long: 'The procedural atelier watches targets, arrivals, actions, and consequences.' },
+      thinking: { short: 'Nano imagining', long: 'GPT-5.4 Nano is asking the Illustrator, Ecologist, Anthropologist, and Inventor what this move could become.' },
+      connected: { short: 'Nano breathing', long: 'GPT-5.4 Nano is shaping names, forecasts, cultures, inventions, and visible world direction. Deterministic rules still govern cost and consequence.' },
       fallback: { short: 'Local atelier', long: 'Nano was unavailable, so the procedural gamemasters continued without interrupting the world.' },
     };
     this.nanoStatus.dataset.status = this.nanoState;
@@ -677,6 +1135,20 @@ export class NolybabHud {
     this.hoverNote.setAttribute('aria-hidden', 'false');
   }
 
+  private showCivicTargetHover(target: CivicTargetRef | null, point?: { x: number; y: number }): void {
+    if (!target || !point || window.matchMedia('(hover: none)').matches) {
+      this.hoverNote.classList.remove('is-visible');
+      this.hoverNote.setAttribute('aria-hidden', 'true');
+      return;
+    }
+    const option = this.collectCommandTargets(this.latestSnapshot, false).find((candidate) => targetKey(candidate.target) === targetKey(target));
+    this.hoverNote.innerHTML = `<strong>${escapeHtml(option?.label ?? target.kind.replaceAll('-', ' '))}</strong><span>${escapeHtml(option?.meta ?? 'Selectable civic target')}</span><em>touch to author an action here</em>`;
+    this.hoverNote.style.left = `${Math.min(window.innerWidth - 280, point.x + 18)}px`;
+    this.hoverNote.style.top = `${Math.min(window.innerHeight - 140, point.y + 18)}px`;
+    this.hoverNote.classList.add('is-visible');
+    this.hoverNote.setAttribute('aria-hidden', 'false');
+  }
+
   private handleKeyboard(event: KeyboardEvent): void {
     if (!this.hasEntered) return;
     if (event.key === 'Escape') {
@@ -689,7 +1161,7 @@ export class NolybabHud {
       const voice = VOICES[Number(event.key) - 1];
       if (voice) this.toggleVoice(voice.id);
     } else if (event.key === 'Enter') {
-      this.advanceCouncil();
+      this.executeCommand();
     } else if (event.key.toLowerCase() === 'm') {
       must<HTMLButtonElement>('memory-button').click();
     } else if (event.key.toLowerCase() === 'g') {

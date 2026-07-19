@@ -2409,3 +2409,937 @@ kbd {
     -webkit-line-clamp: 1;
   }
 }
+
+/* Player command surface: civilization is authored here, while the world stays visible. */
+.question-cluster {
+  width: min(560px, 45vw);
+  padding: 0 18px 9px;
+  background: linear-gradient(180deg, rgb(7 16 13 / 78%), rgb(7 16 13 / 28%) 72%, transparent);
+}
+
+.question-cluster::after {
+  width: 34%;
+  margin-top: 8px;
+}
+
+.pressure-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 9px;
+}
+
+.pressure-label {
+  color: var(--scar);
+  font-family: var(--measure);
+  font-size: 0.46rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.pressure-heading #question-title {
+  margin: 5px 0 3px;
+  font-size: clamp(1.12rem, 1.55vw, 1.52rem);
+  line-height: 1.03;
+}
+
+.question-cluster > p {
+  margin: 2px auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.question-cluster .question-prompt {
+  max-width: 94%;
+  color: rgb(232 221 189 / 66%);
+  font-size: 0.66rem;
+}
+
+.voice-dock.council-surface.command-deck {
+  --command-color: var(--sun);
+  right: auto;
+  bottom: var(--safe-bottom);
+  left: 50%;
+  display: block;
+  width: min(1240px, calc(100vw - 260px));
+  max-height: min(284px, 36svh);
+  padding: 0;
+  overflow: visible;
+  border-color: color-mix(in srgb, var(--command-color), transparent 78%);
+  border-radius: 19px 7px 22px 10px;
+  background:
+    linear-gradient(113deg, rgb(17 28 23 / 96%), rgb(7 16 13 / 94%)),
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--command-color), transparent 89%), transparent 42%);
+  box-shadow: 0 22px 75px rgb(0 0 0 / 42%), inset 0 1px rgb(232 221 189 / 5%);
+  backdrop-filter: blur(16px);
+  transform: translateX(-50%);
+  transition: border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.command-deck .command-status {
+  display: grid;
+  min-height: 38px;
+  grid-template-columns: minmax(235px, 1.05fr) minmax(240px, 0.85fr) minmax(295px, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid rgb(232 221 189 / 9%);
+  background: rgb(7 16 13 / 40%);
+}
+
+.command-heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.command-heading > span {
+  flex: 0 0 auto;
+  color: var(--command-color);
+  font-family: var(--measure);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.command-heading > strong {
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(232 221 189 / 72%);
+  font-family: var(--display);
+  font-size: 0.68rem;
+  font-style: italic;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-status > ol {
+  justify-content: center;
+}
+
+.command-status li {
+  font-size: 0.4rem;
+}
+
+.command-status li span {
+  display: none;
+}
+
+.command-status li:not(:last-child)::after {
+  width: clamp(12px, 2vw, 28px);
+}
+
+.command-interrupts {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.interrupt-button,
+.reshape-button {
+  min-height: 25px;
+  padding: 4px 9px;
+  border: 1px solid rgb(232 221 189 / 13%);
+  border-radius: 9px 3px 10px 5px;
+  color: rgb(232 221 189 / 67%);
+  background: rgb(232 221 189 / 3%);
+  cursor: pointer;
+  font-family: var(--measure);
+  font-size: 0.45rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.interrupt-button:hover:not(:disabled),
+.reshape-button:hover:not(:disabled),
+.reshape-button[aria-pressed="true"] {
+  border-color: rgb(239 196 90 / 48%);
+  color: var(--sun);
+  background: rgb(239 196 90 / 8%);
+}
+
+.interrupt-button:disabled,
+.reshape-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.command-deck .nano-status {
+  margin-left: 3px;
+  font-size: 0.41rem;
+}
+
+.command-deck .command-workbench {
+  position: relative;
+  display: grid;
+  min-height: 174px;
+  grid-template-columns: minmax(136px, 0.7fr) minmax(175px, 0.9fr) minmax(220px, 1.15fr) minmax(215px, 1.1fr) minmax(255px, 1.3fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 8px;
+}
+
+.command-lane {
+  min-width: 0;
+  padding: 3px 10px 2px;
+  border-right: 1px solid rgb(232 221 189 / 8%);
+}
+
+.command-lane-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+  color: rgb(232 221 189 / 44%);
+  font-family: var(--measure);
+  font-size: 0.47rem;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.command-lane-heading b {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--command-color), transparent 58%);
+  border-radius: 50%;
+  color: var(--command-color);
+  font-size: 0.43rem;
+}
+
+.command-domain {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.command-domain button {
+  display: grid;
+  min-height: 50px;
+  place-items: center;
+  gap: 1px;
+  padding: 5px;
+  border: 1px solid rgb(232 221 189 / 9%);
+  border-radius: 11px 4px 12px 6px;
+  color: rgb(232 221 189 / 48%);
+  background: rgb(232 221 189 / 2%);
+  cursor: pointer;
+  font-family: var(--measure);
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.command-domain button i {
+  color: rgb(232 221 189 / 38%);
+  font-family: var(--display);
+  font-size: 0.84rem;
+  font-style: normal;
+}
+
+.command-domain button:hover,
+.command-domain button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--command-color), transparent 48%);
+  color: var(--bone);
+  background: color-mix(in srgb, var(--command-color), transparent 90%);
+}
+
+.command-domain button[aria-pressed="true"] i {
+  color: var(--command-color);
+}
+
+.command-targets {
+  display: grid;
+  max-height: 132px;
+  gap: 4px;
+  overflow: auto;
+  padding-right: 3px;
+  scrollbar-color: rgb(232 221 189 / 14%) transparent;
+  scrollbar-width: thin;
+}
+
+.command-targets button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px 3px 9px 5px;
+  color: rgb(232 221 189 / 58%);
+  background: rgb(232 221 189 / 2.5%);
+  cursor: pointer;
+  text-align: left;
+}
+
+.command-targets button::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 5px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--water);
+}
+
+.command-targets button.is-urgent::before {
+  background: var(--scar);
+  box-shadow: 0 0 8px rgb(227 102 78 / 65%);
+}
+
+.command-targets button span {
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-targets button small {
+  overflow: hidden;
+  color: rgb(232 221 189 / 31%);
+  font-family: var(--measure);
+  font-size: 0.4rem;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.command-targets button:hover,
+.command-targets button[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--command-color), transparent 58%);
+  color: var(--bone);
+  background: color-mix(in srgb, var(--command-color), transparent 92%);
+}
+
+.command-deck .council-choosing,
+.command-deck[data-phase="council"] .council-choosing,
+.command-deck[data-phase="decision"] .council-choosing {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: start;
+  gap: 5px;
+  padding: 3px 10px 2px;
+}
+
+.command-deck .selection-copy {
+  min-height: 25px;
+}
+
+.command-deck .selected-voices {
+  min-height: 21px;
+  gap: 4px;
+}
+
+.command-deck .empty-selection {
+  font-size: 0.68rem;
+}
+
+.command-deck .voice-chip {
+  gap: 4px;
+  padding: 2px 3px;
+}
+
+.command-deck .voice-chip i {
+  width: auto;
+  height: auto;
+  padding: 1px 3px;
+  border-radius: 4px;
+  font-size: 0.35rem;
+  text-transform: uppercase;
+}
+
+.command-deck .voice-chip span {
+  font-size: 0.68rem;
+}
+
+.command-deck .voice-roster {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.command-deck .voice-choice {
+  display: grid;
+  min-height: 24px;
+  grid-template-columns: 7px minmax(0, 1fr);
+  gap: 0 4px;
+  padding: 3px 5px;
+  font-size: 0.57rem;
+}
+
+.command-deck .voice-choice::before {
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+.command-deck .voice-choice span,
+.command-deck .voice-choice small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-deck .voice-choice small {
+  color: rgb(232 221 189 / 27%);
+  font-family: var(--measure);
+  font-size: 0.34rem;
+  text-transform: uppercase;
+}
+
+.command-deck .voice-choice[aria-pressed="true"]::after {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 11px;
+  height: 11px;
+  font-size: 0.32rem;
+}
+
+.command-deck .lesson-chip {
+  max-width: 100%;
+  margin-top: 1px;
+  font-size: 0.43rem;
+}
+
+.command-action-lane {
+  display: grid;
+  align-content: start;
+}
+
+.command-verbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.command-verbs button {
+  display: grid;
+  min-width: 0;
+  min-height: 31px;
+  gap: 1px;
+  padding: 4px 7px;
+  border: 1px solid rgb(232 221 189 / 8%);
+  border-radius: 8px 3px 9px 5px;
+  color: rgb(232 221 189 / 52%);
+  background: rgb(232 221 189 / 2%);
+  cursor: pointer;
+  text-align: left;
+}
+
+.command-verbs button span {
+  font-family: var(--display);
+  font-size: 0.64rem;
+}
+
+.command-verbs button small {
+  overflow: hidden;
+  color: rgb(232 221 189 / 28%);
+  font-size: 0.38rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-verbs button:hover:not(:disabled),
+.command-verbs button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--command-color), transparent 52%);
+  color: var(--bone);
+  background: color-mix(in srgb, var(--command-color), transparent 91%);
+}
+
+.command-verbs button:disabled {
+  opacity: 0.27;
+  cursor: not-allowed;
+}
+
+.no-affordance {
+  color: var(--scar);
+  font-size: 0.54rem;
+  line-height: 1.35;
+}
+
+.method-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: rgb(232 221 189 / 34%);
+  font-family: var(--measure);
+  font-size: 0.4rem;
+  text-transform: uppercase;
+}
+
+.method-row select {
+  min-width: 0;
+  flex: 1;
+  padding: 3px 4px;
+  border: 0;
+  border-bottom: 1px solid rgb(232 221 189 / 14%);
+  border-radius: 0;
+  color: rgb(232 221 189 / 74%);
+  background: var(--deep-void);
+  font-family: var(--display);
+  font-size: 0.57rem;
+}
+
+.intensity-label {
+  margin-left: 2px;
+}
+
+.command-intensity {
+  display: flex;
+  gap: 2px;
+}
+
+.command-intensity button {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid rgb(232 221 189 / 10%);
+  border-radius: 50%;
+  color: rgb(232 221 189 / 40%);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.42rem;
+}
+
+.command-intensity button[aria-pressed="true"] {
+  border-color: var(--command-color);
+  color: var(--command-color);
+  background: color-mix(in srgb, var(--command-color), transparent 90%);
+}
+
+.action-name {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  color: rgb(232 221 189 / 34%);
+  font-family: var(--measure);
+  font-size: 0.4rem;
+  text-transform: uppercase;
+}
+
+.action-name input {
+  min-width: 0;
+  padding: 3px 1px;
+  border: 0;
+  border-bottom: 1px solid rgb(232 221 189 / 14%);
+  color: var(--bone);
+  background: transparent;
+  font-family: var(--display);
+  font-size: 0.62rem;
+}
+
+.action-name input::placeholder {
+  color: rgb(232 221 189 / 22%);
+}
+
+.command-preview {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 5px;
+  margin: 0 0 0 8px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--command-color), transparent 76%);
+  border-radius: 13px 4px 15px 7px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--command-color), transparent 94%), rgb(7 16 13 / 40%));
+}
+
+.command-preview[data-predicted="ruptured"] {
+  border-color: rgb(227 102 78 / 40%);
+}
+
+.command-preview[data-predicted="rooted"] {
+  border-color: rgb(145 182 107 / 40%);
+}
+
+.preview-heading {
+  display: flex;
+  min-width: 0;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgb(232 221 189 / 34%);
+  font-family: var(--measure);
+  font-size: 0.39rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preview-heading b {
+  overflow: hidden;
+  color: var(--command-color);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-preview > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.1;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.command-preview dl {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  margin: 0;
+}
+
+.command-preview dl div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 5px;
+  padding-top: 3px;
+  border-top: 1px solid rgb(232 221 189 / 6%);
+}
+
+.command-preview dt {
+  color: rgb(232 221 189 / 28%);
+  font-family: var(--measure);
+  font-size: 0.37rem;
+  text-transform: uppercase;
+}
+
+.command-preview dd {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: rgb(232 221 189 / 58%);
+  font-size: 0.47rem;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.command-preview .command-execute {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  margin-top: 1px;
+  padding: 5px 11px;
+  border-color: color-mix(in srgb, var(--command-color), white 14%);
+  border-radius: 11px 4px 12px 7px;
+  background: var(--command-color);
+  font-size: 0.7rem;
+}
+
+.command-feedback {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 14px;
+  max-width: min(560px, 68vw);
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgb(232 221 189 / 9%);
+  border-radius: 9px 3px 10px 5px;
+  color: rgb(232 221 189 / 68%);
+  background: rgb(7 16 13 / 88%);
+  font-family: var(--display);
+  font-size: 0.62rem;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+  pointer-events: none;
+}
+
+.command-feedback:empty {
+  display: none;
+}
+
+.command-feedback[data-kind="success"] {
+  border-color: rgb(145 182 107 / 34%);
+  color: var(--growth);
+}
+
+.command-feedback[data-kind="warning"] {
+  border-color: rgb(227 102 78 / 34%);
+  color: var(--scar);
+}
+
+.command-deck .proposal-list,
+.command-deck .proposal-list[hidden] {
+  display: none;
+}
+
+@media (max-width: 1180px) and (min-width: 721px) {
+  .voice-dock.council-surface.command-deck {
+    width: min(970px, calc(100vw - 168px));
+    max-height: 354px;
+  }
+
+  .command-deck .command-status {
+    grid-template-columns: minmax(210px, 1fr) minmax(185px, 0.7fr) minmax(260px, 1fr);
+  }
+
+  .command-deck .command-workbench {
+    grid-template-columns: minmax(135px, 0.65fr) minmax(170px, 0.82fr) minmax(205px, 1fr) minmax(205px, 1fr);
+  }
+
+  .command-preview {
+    grid-column: 1 / -1;
+    grid-template-columns: 0.7fr 1fr 2fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    margin: 7px 0 0;
+  }
+
+  .command-preview dl {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+
+  .command-preview .command-execute {
+    min-width: 160px;
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
+}
+
+@media (max-width: 720px) {
+  .identity-cluster {
+    top: calc(var(--safe-top) - 8px);
+    left: calc(var(--safe-left) - 8px);
+    width: 150px;
+  }
+
+  .identity-cluster .eyebrow {
+    display: none;
+  }
+
+  .identity-cluster h1 {
+    font-size: 1.8rem;
+  }
+
+  .epoch-label {
+    margin-top: 4px;
+    font-size: 0.48rem;
+  }
+
+  .question-cluster {
+    top: calc(var(--safe-top) - 8px);
+    left: 47%;
+    width: min(60vw, 330px);
+    padding: 0 4px 7px;
+    text-align: right;
+  }
+
+  .question-origin,
+  .pressure-heading {
+    justify-content: flex-end;
+  }
+
+  .pressure-label,
+  .question-cluster #question-situation,
+  .question-cluster .question-prompt,
+  .question-cluster::after {
+    display: none;
+  }
+
+  .pressure-heading #question-title {
+    max-width: 100%;
+    margin-top: 3px;
+    overflow: hidden;
+    font-size: 0.84rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .voice-dock.council-surface.command-deck {
+    right: calc(var(--safe-right) + 36px);
+    bottom: var(--safe-bottom);
+    left: var(--safe-left);
+    width: auto;
+    max-height: min(258px, 39svh);
+    overflow: hidden;
+    border-radius: 15px 5px 17px 8px;
+    transform: none;
+  }
+
+  .side-drawer {
+    visibility: hidden;
+    transition: transform 360ms cubic-bezier(0.2, 0.72, 0.26, 1), visibility 0s 360ms;
+  }
+
+  .side-drawer.is-open {
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .command-deck .command-status {
+    position: static;
+    display: grid;
+    min-height: 34px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px;
+    padding: 5px 7px;
+  }
+
+  .command-heading > strong {
+    font-size: 0.63rem;
+  }
+
+  .command-status > ol {
+    display: none;
+  }
+
+  .command-interrupts {
+    gap: 3px;
+  }
+
+  .interrupt-button,
+  .reshape-button {
+    min-height: 23px;
+    max-width: 96px;
+    overflow: hidden;
+    padding: 3px 6px;
+    font-size: 0.45rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .command-deck .nano-status {
+    display: none;
+  }
+
+  .command-deck .command-workbench {
+    display: flex;
+    min-height: 203px;
+    gap: 0;
+    padding: 7px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-color: rgb(232 221 189 / 13%) transparent;
+    scrollbar-width: thin;
+  }
+
+  .command-lane,
+  .command-deck .council-choosing,
+  .command-preview {
+    flex: 0 0 min(245px, 74vw);
+    min-height: 184px;
+    padding: 4px 10px;
+    border-right: 1px solid rgb(232 221 189 / 9%);
+    scroll-snap-align: start;
+  }
+
+  .command-lane-heading {
+    font-size: 0.56rem;
+  }
+
+  .command-domain button {
+    font-size: 0.57rem;
+  }
+
+  .command-domain button i {
+    font-size: 1rem;
+  }
+
+  .command-targets button span {
+    font-size: 0.72rem;
+  }
+
+  .command-targets button small {
+    font-size: 0.46rem;
+  }
+
+  .command-deck .voice-choice {
+    font-size: 0.64rem;
+  }
+
+  .command-deck .voice-choice small,
+  .command-verbs button small {
+    font-size: 0.41rem;
+  }
+
+  .command-verbs button span {
+    font-size: 0.7rem;
+  }
+
+  .method-row,
+  .action-name {
+    font-size: 0.46rem;
+  }
+
+  .method-row select,
+  .action-name input {
+    font-size: 0.64rem;
+  }
+
+  .preview-heading,
+  .command-preview dt {
+    font-size: 0.43rem;
+  }
+
+  .command-preview > strong {
+    font-size: 0.9rem;
+  }
+
+  .command-preview dd {
+    font-size: 0.54rem;
+  }
+
+  .command-domain-lane {
+    flex-basis: min(190px, 58vw);
+  }
+
+  .command-preview {
+    display: grid;
+    flex-basis: min(280px, 82vw);
+    margin: 0;
+  }
+
+  .command-targets {
+    max-height: 151px;
+  }
+
+  .command-deck .voice-roster {
+    grid-template-columns: repeat(2, minmax(95px, 1fr));
+  }
+
+  .command-feedback {
+    right: 4px;
+    bottom: calc(100% + 5px);
+    left: 4px;
+    max-width: none;
+    font-size: 0.55rem;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 721px) {
+  .voice-dock.council-surface.command-deck {
+    max-height: 245px;
+  }
+
+  .command-deck .command-workbench {
+    min-height: 156px;
+  }
+
+  .command-domain button {
+    min-height: 42px;
+  }
+
+  .command-targets {
+    max-height: 115px;
+  }
+}

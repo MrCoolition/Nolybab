@@ -26,13 +26,16 @@
           <p id="archive-status" class="archive-status" data-status="local"><i></i> local memory</p>
         </header>
 
-        <section id="question-cluster" class="question-cluster">
+        <section id="question-cluster" class="question-cluster" aria-live="polite">
           <div class="question-origin">
             <span id="director-sigil" class="director-sigil"></span>
             <span id="question-origin">The Chorus is listening</span>
             <span id="pulse-clock">∞</span>
           </div>
-          <h2 id="question-title">The first living question is forming</h2>
+          <div class="pressure-heading">
+            <span class="pressure-label">Pressure</span>
+            <h2 id="question-title">The first living question is forming</h2>
+          </div>
           <p id="question-situation">Every civilization begins by deciding what it is willing to hear.</p>
           <p id="question-prompt" class="question-prompt">Choose two unlike voices.</p>
         </section>
@@ -53,35 +56,95 @@
           <button id="sound-button" class="glyph-button" type="button" aria-label="Enable generative sound" title="Sound">◌</button>
         </nav>
 
-        <section id="voice-dock" class="voice-dock council-surface" aria-label="The living council">
-          <header class="council-cycle">
-            <ol id="cycle-steps" aria-label="Civic cycle">
+        <section id="voice-dock" class="voice-dock council-surface command-deck" aria-label="Author a civic action">
+          <header class="council-cycle command-status">
+            <div class="command-heading">
+              <span>Your move</span>
+              <strong id="stage-instruction">Choose what changes, where it lands, and who makes it real.</strong>
+            </div>
+            <ol id="cycle-steps" aria-label="World response cycle">
               <li data-phase="pressure"><b>01</b><span>Pressure</span></li>
               <li data-phase="council"><b>02</b><span>Council</span></li>
               <li data-phase="decision"><b>03</b><span>Decide</span></li>
               <li data-phase="action"><b>04</b><span>Act</span></li>
               <li data-phase="growth"><b>05</b><span>Grow</span></li>
             </ol>
-            <p id="stage-instruction">Seat two unlike voices. Difference is the instrument.</p>
-            <span id="nano-status" class="nano-status" data-status="quiet"><i></i> Nano atelier</span>
+            <div class="command-interrupts">
+              <button id="interrupt-button" class="interrupt-button" type="button" aria-label="Interrupt autonomous pressure">Hold world</button>
+              <button id="reshape-button" class="reshape-button" type="button" aria-label="Reshape pressure toward another place" aria-pressed="false">Reshape pressure</button>
+              <span id="nano-status" class="nano-status" data-status="quiet"><i></i> Nano atelier</span>
+            </div>
           </header>
 
-          <div class="council-body">
-            <div class="council-choosing">
+          <div class="council-body command-workbench">
+            <section class="command-lane command-domain-lane" aria-labelledby="command-domain-label">
+              <div class="command-lane-heading"><b>1</b><span id="command-domain-label">Make</span></div>
+              <div id="command-domain" class="command-domain" role="group" aria-label="Kind of civic change">
+                <button type="button" data-domain="law" aria-pressed="true"><i>§</i><span>Law</span></button>
+                <button type="button" data-domain="culture" aria-pressed="false"><i>◎</i><span>Culture</span></button>
+                <button type="button" data-domain="invention" aria-pressed="false"><i>✦</i><span>Invention</span></button>
+                <button type="button" data-domain="habitat" aria-pressed="false"><i>⌂</i><span>Build</span></button>
+              </div>
+            </section>
+
+            <section class="command-lane command-target-lane" aria-labelledby="command-target-label">
+              <div class="command-lane-heading"><b>2</b><span id="command-target-label">Target</span></div>
+              <div id="command-targets" class="command-targets" role="listbox" aria-label="Action target">
+                <button type="button" role="option" data-target-kind="pressure" aria-selected="true">Current pressure</button>
+              </div>
+            </section>
+
+            <section class="command-lane council-choosing" aria-labelledby="coalition-label">
+              <div class="command-lane-heading"><b>3</b><span id="coalition-label">People</span></div>
               <div class="selection-copy">
-                <span class="dock-label">Council seats</span>
-                <div id="selected-voices" class="selected-voices">
-                  <span class="empty-selection">Two voices are waiting to be heard</span>
+                <div id="selected-voices" class="selected-voices" aria-live="polite">
+                  <span class="empty-selection">Choose a lead culture</span>
                 </div>
                 <button id="lesson-chip" class="lesson-chip" type="button" hidden></button>
               </div>
-              <div id="voice-roster" class="voice-roster" aria-label="Available voices"></div>
-            </div>
+              <div id="voice-roster" class="voice-roster" aria-label="Cultures and possible coalition"></div>
+            </section>
+
+            <section class="command-lane command-action-lane" aria-labelledby="command-action-label">
+              <div class="command-lane-heading"><b>4</b><span id="command-action-label">Do</span></div>
+              <div id="command-verbs" class="command-verbs" role="group" aria-label="Immediate civic verb"></div>
+              <div class="method-row">
+                <label for="command-method">through</label>
+                <select id="command-method" aria-label="Civic method">
+                  <option value="prototype">a prototype</option>
+                  <option value="ritual">a ritual</option>
+                  <option value="boundary">a boundary</option>
+                  <option value="reciprocity">reciprocity</option>
+                  <option value="witness">witness</option>
+                  <option value="remembrance">remembrance</option>
+                  <option value="play">play</option>
+                </select>
+                <span class="intensity-label">force</span>
+                <div id="command-intensity" class="command-intensity" role="group" aria-label="Action intensity">
+                  <button type="button" data-intensity="1" aria-pressed="false">1</button>
+                  <button type="button" data-intensity="2" aria-pressed="true">2</button>
+                  <button type="button" data-intensity="3" aria-pressed="false">3</button>
+                </div>
+              </div>
+              <label class="action-name" for="action-name"><span>Name it</span><input id="action-name" maxlength="56" autocomplete="off" placeholder="optional…" /></label>
+            </section>
+
+            <aside id="command-preview" class="command-preview" aria-label="Action forecast" aria-live="polite">
+              <div class="preview-heading"><span>Before you commit</span><b id="preview-target">Current pressure</b></div>
+              <strong id="preview-title">Choose a culture to lead</strong>
+              <dl>
+                <div><dt>Creates</dt><dd id="preview-creates">a living civic artifact</dd></div>
+                <div><dt>Changes</dt><dd id="preview-changes">the world will show the effect here</dd></div>
+                <div><dt>Cost / risk</dt><dd id="preview-risk">nothing is free</dd></div>
+              </dl>
+              <button id="weave-button" class="weave-button command-execute" type="button" disabled>
+                <span>Choose a lead culture</span>
+                <small>Enter</small>
+              </button>
+            </aside>
+
             <div id="proposal-list" class="proposal-list" aria-label="Council proposals" hidden></div>
-            <button id="weave-button" class="weave-button" type="button" disabled>
-              <span>Convene the council</span>
-              <small>Enter</small>
-            </button>
+            <p id="command-feedback" class="command-feedback" role="status" aria-live="assertive"></p>
           </div>
         </section>
 
@@ -132,22 +195,22 @@
           </div>
 
           <section id="guide-play" class="guide-panel" role="tabpanel" aria-labelledby="guide-play-tab">
-            <p class="codex-lead">Read the pressure, seat two unlike voices, choose what they will attempt, then watch the world keep the consequence.</p>
+            <p class="codex-lead">You author concrete civic moves. Every target, culture, verb, method, and intensity changes the cost and forecast before you commit.</p>
             <ol class="play-sequence">
-              <li><b>Pressure</b><span>A gamemaster reveals a need. The clock tells you when the world will answer on its own.</span></li>
-              <li><b>Council</b><span>Seat two cultures by touching their world glyphs or roster names. No voice contains the whole.</span></li>
-              <li><b>Decide</b><span>Choose a shared minimum, protected difference, or reversible trial. Carry a scar from Memory when an old failure belongs here.</span></li>
-              <li><b>Act</b><span>The council builds. You do not place buildings; you shape participation, intent, and what must remain reversible.</span></li>
-              <li><b>Grow</b><span>A ritual, protocol, covenant, archive, shared word, or visible fracture enters the Commons and changes later questions.</span></li>
+              <li><b>Choose what</b><span>Make a law, shape a culture, invent something, or build a new way of living.</span></li>
+              <li><b>Choose where</b><span>Touch a pressure, arrival, settlement, region, living artifact, or the Commons in the world or Target lane.</span></li>
+              <li><b>Choose who</b><span>Name a lead culture and, if you want friction or wider consent, add an ally.</span></li>
+              <li><b>Choose how</b><span>Act with an immediate verb through witness, prototype, ritual, boundary, reciprocity, remembrance, or play. Set the force and name the result.</span></li>
+              <li><b>Commit</b><span>Read the explicit resource cost, risk, likely pressure shift, and artifact forecast. Act now, interrupt autonomy, or reroute the pressure elsewhere.</span></li>
             </ol>
-            <div class="control-legend"><span><kbd>1–7</kbd> seat voices</span><span><kbd>Enter</kbd> act</span><span><kbd>M</kbd> memory</span><span><kbd>G</kbd> gamemasters</span><span><kbd>?</kbd> guide</span></div>
+            <div class="control-legend"><span><kbd>1–7</kbd> choose cultures</span><span><kbd>Enter</kbd> commit</span><span><kbd>M</kbd> memory</span><span><kbd>G</kbd> gamemasters</span><span><kbd>?</kbd> guide</span></div>
           </section>
 
           <section id="guide-world" class="guide-panel" role="tabpanel" aria-labelledby="guide-world-tab" hidden>
-            <p class="codex-lead">This is a civilization organism, not a city builder. Councils turn social choices into civic works; works alter relationships, memory, and the questions that can be asked next.</p>
+            <p class="codex-lead">This is a civilization organism, not a city builder. Your actions create living laws, cultural practices, inventions, settlements, sites, migrations, and new pressures that continue changing after you touch them.</p>
             <dl class="premise-list">
               <div><dt>Colored constellations</dt><dd>The seven cultures. Brightness is presence; their threads are relationships.</dd></div>
-              <div><dt>The breathing center</dt><dd>The Commons. New civic works root here and extend outward.</dd></div>
+              <div><dt>The breathing center</dt><dd>The Commons. Laws, cultures, inventions, habitats, arrivals, and pressures move through it rather than waiting in an event queue.</dd></div>
               <div><dt>Mistake Mountain</dt><dd>Failures remain as playable terrain instead of becoming reloads.</dd></div>
               <div><dt>Nano atelier</dt><dd>GPT-5.4 Nano can improvise council language and procedural visual direction. Validated simulation rules alone apply consequences.</dd></div>
               <div><dt>Deep memory</dt><dd>Neon preserves civic actions and artifacts in an append-only world ledger while the active organism stays light enough to breathe forever.</dd></div>

@@ -1,33 +1,35 @@
 # Nolybab: Reverse Babylon
 
-An open-ended civilization organism about learning to act together without becoming the same.
+Nolybab is a living civilization simulation about humans arriving after extractive civilization has failed and learning to settle without rebuilding the machine that ended it.
 
-Nolybab is **not a city builder**. Seven cultures meet living pressures, hold councils, choose civic actions, and permanently alter the Commons. Growth appears as relationships, rituals, covenants, protocols, shared words, remembered scars, and procedural artifacts—not territory or inventory.
+It is not a city builder. The player authors civic moves in a spatial, evolving world: shelter an arrival, seed a habitat, amend a law, translate between cultures, prototype an invention, reroute a pressure, invite the unknown, compost a failed institution, or refuse a harmful demand. The visible world grows from those choices as people, paths, settlements, ecological systems, charters, rituals, inventions, and remembered scars.
 
-## The civic loop
+## The playable loop
 
-1. **Pressure** — an internal gamemaster reveals a need and frames the living question.
-2. **Council** — seat two unlike cultures; each brings a gift, a shadow, and a right to resist.
-3. **Decide** — choose a shared minimum, carry protected difference, or begin a reversible trial.
-4. **Act** — the council turns that choice into a concrete civic work with a real cost.
-5. **Grow** — the work draws itself into the Commons and changes later questions.
+1. **Read the world** — moving pressures, arriving communities, living regions, and existing artifacts are direct spatial targets.
+2. **Choose what changes** — habitat, law, culture, or invention.
+3. **Author the act** — select a verb, method, intensity, lead culture, ally, target, and optional name.
+4. **See the stakes** — finite attention, trust, vitality, and possibility produce a deterministic cost, risk, and consequence forecast.
+5. **Commit or interrupt** — act immediately, hold an autonomous response, or physically reroute a pressure.
+6. **Watch civilization answer** — people move and settle; construction unfolds; routes, ecologies, laws, practices, and inventions mutate over time.
 
-Unanswered pressures are resolved autonomously. Failures are not reloads: they become strata in Mistake Mountain and can be carried into a later council until their civic function changes.
+There is no fixed tech tree and no final victory. Repeated habits lose potency. Dissent, ecological cost, and unresolved mistakes remain playable. Healthy worlds flourish into stranger forms; damaged worlds fracture and regenerate while keeping their history.
 
-There is no final victory. Healthy civilizations enter new Dawns with new constraints; unhealthy ones compost into another epoch while inheriting their memory.
+## The living atelier
 
-## The eight gamemasters
+`gpt-5.4-nano` enters early and often through the server:
 
-- **The Chorus** protects plurality and watches for semantic monoculture.
-- **The Mycelium** gives ecological consequences non-human agency.
-- **The Countermirror** learns the player’s habits and exposes their shadows.
-- **The Archivist** resurfaces unfinished mistakes.
-- **The Uninvited** protects novelty and unoptimized attention.
-- **The Illustrator** converts consequences into procedural visual grammar.
-- **The Civic Architect** keeps structures permeable, reversible, and answerable.
-- **The Storyweaver** binds today’s choice to its causes and descendants.
+- **Arrival** — names and characterizes the human community, their skills, needs, vow, and sustainable visual language.
+- **Foresee** — enriches the action forecast while the player aims a move.
+- **Consequence** — names the created artifact, gives it a doctrine or blueprint, voices dissent, and supplies procedural visual direction.
 
-The last three can be amplified server-side by `gpt-5.4-nano`. Model output can enrich language and visual direction, but it cannot change votes, costs, odds, qualities, timers, IDs, or deterministic simulation rules.
+The Illustrator, Ecologist, Anthropologist, Inventor, Civic Architect, and Storyweaver are expressive gamemasters. Model output is strictly structured and validated. It may enrich names, descriptions, options, and visual grammar; it cannot invent IDs, spend resources, alter odds, or bypass deterministic civic rules.
+
+If Nano is unavailable, cached and procedural generation keep the world playable without blocking input.
+
+## Memory and infinite expansion
+
+The browser keeps the active organism responsive. Neon stores revisioned checkpoints plus an append-only ledger containing every authored action and every settlement, region, arrival, site, law, cultural practice, invention, civic work, shared word, and remembered scar. Older active details can compact out of the immediate simulation without being erased from the civilization's deep history.
 
 ## Run locally
 
@@ -49,32 +51,20 @@ npm run preview
 
 Set these as encrypted Production and Preview variables:
 
-- `OPEN_AI_API_KEY` (or `OPENAI_API_KEY`) — enables the Nano atelier through `/api/gamemaster`.
-- `NEON_DB_CONNECT` (or `DATABASE_URL`) — enables durable world checkpoints and the append-only civic ledger through `/api/world`.
+- `OPEN_AI_API_KEY` (or `OPENAI_API_KEY`) enables the Nano living atelier.
+- `NEON_DB_CONNECT` (or `DATABASE_URL`) enables checkpoints and the append-only civic ledger.
 
-Secrets are read only by serverless functions and are never included in the browser bundle. Without either service, the deterministic local simulation continues uninterrupted.
-
-The Neon schema is created lazily by the API and is also documented in `docs/schema.sql`. Each browser creates a private world ID and write key. The server stores only a SHA-256 hash of that key. Checkpoints use monotonic revisions, while civic events and artifacts are append-only and replay-safe.
-
-## Controls
-
-- Click/tap world glyphs or roster names to seat cultures.
-- `1`–`7` seats cultures by their circular order.
-- `Enter` enacts the selected proposal.
-- `Space` pauses or resumes the organism.
-- `M` opens Memory.
-- `G` opens the gamemasters.
-- `?` opens How It Works.
+Secrets stay in Vercel Functions and are never shipped to the browser. `/api/nano-civic` owns arrival, forecast, and consequence generations; `/api/gamemaster` remains compatible with older council saves; `/api/world` owns durable world memory.
 
 ## Architecture
 
-- `src/simulation/` owns deterministic civic rules and serializable state.
-- `src/rendering/` translates state into the procedural Phaser world; it never owns mechanics.
-- `src/ui/` owns the accessible council surface, drawers, onboarding, and controls.
-- `src/ai/` validates optional Nano enrichment.
-- `src/persistence/` owns local identity, durable checkpoints, and ledger synchronization.
-- `api/` contains the OpenAI and Neon Vercel functions.
+- `src/simulation/` owns deterministic, serializable civic mechanics.
+- `src/rendering/` turns state into a procedural Phaser landscape; it never owns game rules.
+- `src/ui/` owns the accessible command deck, previews, records, and guidance.
+- `src/ai/` validates optional Nano generations.
+- `src/persistence/` owns local identity, checkpoint compaction, and ledger synchronization.
+- `api/` contains the OpenAI and Neon Vercel Functions.
 
 ## Audio
 
-Track 01: `Whispers of the Sacred Canopy`, supplied for this project at `public/audio/whispers-of-the-sacred-canopy.wav`.
+Track 01 is `Whispers of the Sacred Canopy`, supplied for this project at `public/audio/whispers-of-the-sacred-canopy.wav`.

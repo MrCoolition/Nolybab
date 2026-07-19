@@ -83,12 +83,12 @@ const MAX_CONFLICT_RETRIES = 2;
 const MAX_RETRY_DELAY_MS = 60_000;
 
 const SNAPSHOT_PROFILES = [
-  { history: 60, lessons: 80, lexicon: 100, laws: 30, works: 72 },
-  { history: 42, lessons: 60, lexicon: 76, laws: 24, works: 56 },
-  { history: 28, lessons: 42, lexicon: 54, laws: 18, works: 42 },
-  { history: 16, lessons: 28, lexicon: 36, laws: 12, works: 30 },
-  { history: 8, lessons: 16, lexicon: 22, laws: 8, works: 20 },
-  { history: 4, lessons: 8, lexicon: 12, laws: 6, works: 12 },
+  { history: 60, lessons: 80, lexicon: 100, laws: 30, works: 72, actions: 90, pressures: 12, settlements: 40, inventions: 52, charterLaws: 44, cultures: 48, arrivals: 20, sites: 64 },
+  { history: 42, lessons: 60, lexicon: 76, laws: 24, works: 56, actions: 68, pressures: 10, settlements: 32, inventions: 42, charterLaws: 34, cultures: 38, arrivals: 16, sites: 52 },
+  { history: 28, lessons: 42, lexicon: 54, laws: 18, works: 42, actions: 50, pressures: 9, settlements: 26, inventions: 32, charterLaws: 26, cultures: 30, arrivals: 14, sites: 42 },
+  { history: 16, lessons: 28, lexicon: 36, laws: 12, works: 30, actions: 36, pressures: 8, settlements: 20, inventions: 24, charterLaws: 20, cultures: 22, arrivals: 12, sites: 32 },
+  { history: 8, lessons: 16, lexicon: 22, laws: 8, works: 20, actions: 24, pressures: 7, settlements: 15, inventions: 18, charterLaws: 15, cultures: 16, arrivals: 10, sites: 24 },
+  { history: 4, lessons: 8, lexicon: 12, laws: 6, works: 12, actions: 14, pressures: 6, settlements: 10, inventions: 12, charterLaws: 10, cultures: 11, arrivals: 8, sites: 16 },
 ] as const;
 
 function randomKey(): string {
@@ -353,6 +353,40 @@ function captureSnapshotLedgers(state: OutboxState, snapshot: SimulationSnapshot
   for (const law of snapshot.laws) {
     changed = addOutboxRecord(state, makeOutboxRecord('artifact', law.id, 'epoch-law', law, capturedAt), known) || changed;
   }
+  for (const action of snapshot.agency.actionHistory) {
+    changed = addOutboxRecord(state, makeOutboxRecord('event', action.id, `player-action:${action.input.domain}:${action.input.verb}`, action, capturedAt), known) || changed;
+  }
+  for (const pressure of snapshot.agency.pressures) {
+    const id = safeLedgerId(pressure.id, `:${pressure.state}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('event', id, `pressure:${pressure.kind}:${pressure.state}`, pressure, capturedAt), known) || changed;
+  }
+  for (const region of snapshot.agency.regions) {
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', region.id, `world-region:${region.terrain}`, region, capturedAt), known) || changed;
+  }
+  for (const settlement of snapshot.agency.settlements) {
+    const id = safeLedgerId(settlement.id, `:r${settlement.revision}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, `settlement:${settlement.form}`, settlement, capturedAt), known) || changed;
+  }
+  for (const invention of snapshot.agency.inventions) {
+    const id = safeLedgerId(invention.id, `:r${invention.revision}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, 'civic-invention', invention, capturedAt), known) || changed;
+  }
+  for (const law of snapshot.agency.charterLaws) {
+    const id = safeLedgerId(law.id, `:r${law.revision}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, 'living-charter-law', law, capturedAt), known) || changed;
+  }
+  for (const culture of snapshot.agency.cultures) {
+    const id = safeLedgerId(culture.id, `:r${culture.revision}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, 'cultural-practice', culture, capturedAt), known) || changed;
+  }
+  for (const site of snapshot.agency.sites) {
+    const id = safeLedgerId(site.id, `:r${site.revision}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, `civic-site:${site.kind}:${site.status}`, site, capturedAt), known) || changed;
+  }
+  for (const arrival of snapshot.agency.arrivals) {
+    const id = safeLedgerId(arrival.id, `:r${arrival.revision}:${arrival.status}`);
+    changed = addOutboxRecord(state, makeOutboxRecord('artifact', id, `human-arrival:${arrival.kind}:${arrival.status}`, arrival, capturedAt), known) || changed;
+  }
 
   if (changed) persistOutbox(state);
   return changed;
@@ -377,6 +411,17 @@ function compactSnapshot(snapshot: SimulationSnapshot): SimulationSnapshot | nul
       lexicon: snapshot.lexicon.slice(-profile.lexicon),
       laws: snapshot.laws.slice(-profile.laws),
       works,
+      agency: {
+        ...snapshot.agency,
+        pressures: snapshot.agency.pressures.slice(-profile.pressures),
+        settlements: snapshot.agency.settlements.slice(-profile.settlements),
+        inventions: snapshot.agency.inventions.slice(-profile.inventions),
+        charterLaws: snapshot.agency.charterLaws.slice(-profile.charterLaws),
+        cultures: snapshot.agency.cultures.slice(-profile.cultures),
+        arrivals: snapshot.agency.arrivals.slice(-profile.arrivals),
+        sites: snapshot.agency.sites.slice(-profile.sites),
+        actionHistory: snapshot.agency.actionHistory.slice(-profile.actions),
+      },
       archivedWorkCount: snapshot.archivedWorkCount + Math.max(0, snapshot.works.length - works.length),
     };
     if (jsonBytes(candidate) <= TARGET_SNAPSHOT_BYTES) return candidate;
@@ -493,6 +538,14 @@ export class WorldArchiveClient {
         snapshot.lessons.filter((lesson) => lesson.resolved).length,
         snapshot.lexicon.length,
         snapshot.laws.length,
+        snapshot.agency.actionHistory.at(-1)?.id ?? '',
+        snapshot.agency.pressures.length,
+        snapshot.agency.settlements.length,
+        snapshot.agency.inventions.length,
+        snapshot.agency.charterLaws.length,
+        snapshot.agency.cultures.length,
+        snapshot.agency.arrivals.length,
+        snapshot.agency.sites.length,
         snapshot.history[0]?.id ?? '',
         this.outbox?.pending.length ?? 0,
       ].join(':');
