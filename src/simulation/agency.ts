@@ -4,6 +4,9 @@ import { QUALITY_KEYS } from './types';
 import type {
   ActionOutcomeBand,
   Arrival,
+  BasicNeedMap,
+  CivilizationStage,
+  CivilizationState,
   CivicActionAffordance,
   CivicActionInput,
   CivicActionPreview,
@@ -21,12 +24,14 @@ import type {
   CivicWork,
   CulturalPractice,
   LivingLaw,
+  MaterialStockMap,
   PlayerAgencyState,
   PressureKind,
   ProceduralArtDirection,
   QualityKey,
   QualityMap,
   Settlement,
+  SettlementEconomy,
   SimulationState,
   SpatialPoint,
   VoiceId,
@@ -37,6 +42,10 @@ import type {
 
 const RESOURCE_KEYS = ['attention', 'trust', 'vitality', 'possibility'] as const;
 type ResourceKey = (typeof RESOURCE_KEYS)[number];
+const MATERIAL_KEYS = ['water', 'food', 'materials', 'energy', 'medicine'] as const;
+const NEED_KEYS = ['water', 'food', 'shelter', 'care', 'belonging'] as const;
+const SEASON_NAMES = ['First Rains', 'Green Rise', 'High Sun', 'Seedfall', 'Long Night'] as const;
+const CIVILIZATION_SEASON_SECONDS = 72;
 
 interface VerbDefinition {
   label: string;
@@ -224,6 +233,21 @@ const DOMAIN_COST: Record<CivicDomain, Partial<CivicResourceMap>> = {
   habitat: { vitality: 5, trust: 1 },
 };
 
+const DOMAIN_LABOR: Record<CivicDomain, number> = {
+  law: 1,
+  culture: 2,
+  invention: 3,
+  habitat: 4,
+};
+
+function civicMaterialCost(domain: CivicDomain, intensity: 1 | 2 | 3, verb: CivicVerb): Partial<MaterialStockMap> {
+  const factor = verb === 'compost' ? -0.6 : intensity;
+  if (domain === 'habitat') return { materials: 4 * factor, energy: 1.5 * factor, food: Math.max(0, intensity - 1) };
+  if (domain === 'invention') return { materials: 2.8 * factor, energy: 1.4 * factor };
+  if (domain === 'culture') return { food: 0.8 * factor, energy: 0.35 * factor };
+  return { materials: 0.7 * factor, energy: 0.3 * factor };
+}
+
 const PRESSURE_DATA: Record<
   PressureKind,
   { focus: QualityKey; opposed: QualityKey; subjects: string[]; disturbances: string[]; tags: string[] }
@@ -333,6 +357,134 @@ function distance(a: SpatialPoint, b: SpatialPoint): number {
 
 function resourceCopy(value: CivicResourceMap): CivicResourceMap {
   return resources(value.attention, value.trust, value.vitality, value.possibility);
+}
+
+function materialStocks(
+  water = 0,
+  food = 0,
+  materials = 0,
+  energy = 0,
+  medicine = 0,
+): MaterialStockMap {
+  return { water, food, materials, energy, medicine };
+}
+
+function basicNeeds(water = 1, food = 1, shelter = 1, care = 1, belonging = 1): BasicNeedMap {
+  return { water, food, shelter, care, belonging };
+}
+
+function materialCopy(value?: Partial<MaterialStockMap>): MaterialStockMap {
+  return materialStocks(
+    Math.max(0, finite(value?.water, 0)),
+    Math.max(0, finite(value?.food, 0)),
+    Math.max(0, finite(value?.materials, 0)),
+    Math.max(0, finite(value?.energy, 0)),
+    Math.max(0, finite(value?.medicine, 0)),
+  );
+}
+
+function needCopy(value?: Partial<BasicNeedMap>): BasicNeedMap {
+  return basicNeeds(
+    clamp(finite(value?.water, 1), 0, 1.25),
+    clamp(finite(value?.food, 1), 0, 1.25),
+    clamp(finite(value?.shelter, 1), 0, 1.25),
+    clamp(finite(value?.care, 1), 0, 1.25),
+    clamp(finite(value?.belonging, 1), 0, 1.25),
+  );
+}
+
+function addMaterial(into: MaterialStockMap, from: MaterialStockMap, factor = 1): void {
+  for (const key of MATERIAL_KEYS) into[key] += from[key] * factor;
+}
+
+function terrainYield(terrain: WorldTerrain): MaterialStockMap {
+  const yields: Record<WorldTerrain, MaterialStockMap> = {
+    commons: materialStocks(1, 1, 0.9, 0.9, 0.8),
+    canopy: materialStocks(0.95, 1.22, 1.08, 0.72, 1.18),
+    wetland: materialStocks(1.42, 1.16, 0.72, 0.82, 1.1),
+    highland: materialStocks(0.68, 0.78, 1.34, 1.22, 0.72),
+    basin: materialStocks(1.2, 1.12, 0.84, 0.82, 0.92),
+    delta: materialStocks(1.48, 1.28, 0.7, 0.96, 1.02),
+    ruin: materialStocks(0.54, 0.52, 1.42, 0.9, 0.46),
+  };
+  return yields[terrain];
+}
+
+function createSettlementEconomy(inhabitants: number, region: WorldRegion, welcomed = true): SettlementEconomy {
+  const people = Math.max(0, inhabitants);
+  const populationDivisor = Math.max(1, people);
+  const yieldMap = terrainYield(region.terrain);
+  const vitality = 0.55 + region.vitality * 0.65;
+  const production = materialStocks(
+    people * 0.017 * yieldMap.water * vitality,
+    people * 0.013 * yieldMap.food * vitality,
+    people * 0.0065 * yieldMap.materials * vitality,
+    people * 0.006 * yieldMap.energy * vitality,
+    people * 0.0034 * yieldMap.medicine * vitality,
+  );
+  const consumption = materialStocks(
+    people * 0.018,
+    people * 0.014,
+    people * 0.0035,
+    people * 0.0075,
+    people * 0.003,
+  );
+  const housingCapacity = people === 0 ? 0 : Math.max(5, Math.ceil(people * (welcomed ? 1.12 : 0.76)));
+  return {
+    stocks: materialStocks(people * 3.4, people * 2.7, people * 1.2, people * 1.15, people * 0.55),
+    production,
+    consumption,
+    needs: basicNeeds(
+      clamp(production.water / Math.max(0.01, consumption.water) * 0.72 + 0.22),
+      clamp(production.food / Math.max(0.01, consumption.food) * 0.72 + 0.2),
+      clamp(housingCapacity / populationDivisor),
+      clamp(0.58 + yieldMap.medicine * 0.16 + region.openness * 0.12),
+      clamp((welcomed ? 0.68 : 0.45) + region.openness * 0.2),
+    ),
+    housingCapacity,
+    laborAvailable: Math.floor(people * 0.44),
+    laborCommitted: Math.floor(people * 0.2),
+    health: welcomed ? 0.72 : 0.56,
+    belonging: welcomed ? 0.72 : 0.46,
+    ecologicalLoad: clamp(0.16 + people / Math.max(80, region.radius * 1200) * 0.32),
+    lastNet: materialStocks(),
+  };
+}
+
+function normalizeSettlementEconomy(settlement: Settlement, region: WorldRegion): void {
+  const fallback = createSettlementEconomy(settlement.inhabitants, region, !settlement.traits.includes('self-settled'));
+  const previous = settlement.economy;
+  if (!previous && settlement.traits.includes('keeper-camp')) {
+    fallback.stocks = materialStocks(34, 28, 30, 16, 7);
+    fallback.housingCapacity = Math.max(fallback.housingCapacity, 7);
+  }
+  settlement.economy = {
+    stocks: materialCopy(previous?.stocks ?? fallback.stocks),
+    production: materialCopy(previous?.production ?? fallback.production),
+    consumption: materialCopy(previous?.consumption ?? fallback.consumption),
+    needs: needCopy(previous?.needs ?? fallback.needs),
+    housingCapacity: Math.max(0, finite(previous?.housingCapacity, fallback.housingCapacity)),
+    laborAvailable: Math.max(0, Math.floor(finite(previous?.laborAvailable, fallback.laborAvailable))),
+    laborCommitted: Math.max(0, Math.floor(finite(previous?.laborCommitted, fallback.laborCommitted))),
+    health: clamp(finite(previous?.health, fallback.health), 0, 1),
+    belonging: clamp(finite(previous?.belonging, fallback.belonging), 0, 1),
+    ecologicalLoad: clamp(finite(previous?.ecologicalLoad, fallback.ecologicalLoad), 0, 1.5),
+    lastNet: materialCopy(previous?.lastNet ?? fallback.lastNet),
+  };
+}
+
+function refreshSettlementEconomy(settlement: Settlement, region: WorldRegion): void {
+  normalizeSettlementEconomy(settlement, region);
+  const previous = settlement.economy!;
+  const baseline = createSettlementEconomy(settlement.inhabitants, region, !settlement.traits.includes('self-settled'));
+  settlement.economy = {
+    ...previous,
+    production: baseline.production,
+    consumption: baseline.consumption,
+    housingCapacity: Math.max(previous.housingCapacity, baseline.housingCapacity * Math.max(0.72, settlement.maturity)),
+    laborAvailable: Math.max(0, Math.floor(settlement.inhabitants * (0.4 + previous.health * 0.08))),
+    laborCommitted: Math.min(previous.laborCommitted, Math.max(0, Math.floor(settlement.inhabitants * 0.72))),
+  };
 }
 
 function emptyCost(): CivicResourceMap {
@@ -474,6 +626,126 @@ function createArrival(regions: WorldRegion[], rng: SeededRandom, actionId?: str
   };
 }
 
+function civilizationTotals(settlements: Settlement[]): {
+  population: number;
+  stocks: MaterialStockMap;
+  production: MaterialStockMap;
+  consumption: MaterialStockMap;
+  needs: BasicNeedMap;
+  housingCapacity: number;
+  laborAvailable: number;
+  laborCommitted: number;
+  wellbeing: number;
+  ecologicalLoad: number;
+} {
+  const stocks = materialStocks();
+  const production = materialStocks();
+  const consumption = materialStocks();
+  const weightedNeeds = basicNeeds(0, 0, 0, 0, 0);
+  let population = 0;
+  let housingCapacity = 0;
+  let laborAvailable = 0;
+  let laborCommitted = 0;
+  let wellbeing = 0;
+  let ecologicalLoad = 0;
+  for (const settlement of settlements) {
+    const people = Math.max(1, settlement.inhabitants);
+    const economy = settlement.economy;
+    if (!economy) continue;
+    population += people;
+    addMaterial(stocks, economy.stocks);
+    addMaterial(production, economy.production);
+    addMaterial(consumption, economy.consumption);
+    for (const key of NEED_KEYS) weightedNeeds[key] += economy.needs[key] * people;
+    housingCapacity += economy.housingCapacity;
+    laborAvailable += economy.laborAvailable;
+    laborCommitted += economy.laborCommitted;
+    wellbeing += mean([...NEED_KEYS.map((key) => economy.needs[key]), economy.health, economy.belonging]) * people;
+    ecologicalLoad += economy.ecologicalLoad * people;
+  }
+  if (population > 0) {
+    for (const key of NEED_KEYS) weightedNeeds[key] /= population;
+    wellbeing /= population;
+    ecologicalLoad /= population;
+  }
+  return {
+    population,
+    stocks,
+    production,
+    consumption,
+    needs: needCopy(weightedNeeds),
+    housingCapacity,
+    laborAvailable,
+    laborCommitted,
+    wellbeing: clamp(wellbeing),
+    ecologicalLoad: clamp(ecologicalLoad, 0, 1.5),
+  };
+}
+
+function civilizationStage(
+  population: number,
+  season: number,
+  needs: BasicNeedMap,
+  wellbeing: number,
+  ecologicalLoad: number,
+  civicArtifacts: number,
+): CivilizationStage {
+  const lowestNeed = Math.min(...NEED_KEYS.map((key) => needs[key]));
+  if (population <= 1 || wellbeing < 0.26 || lowestNeed < 0.2) return 'fracture';
+  if (season === 0 && population < 12) return 'landing';
+  if (lowestNeed < 0.62 || wellbeing < 0.55) return 'survival';
+  if (population < 70 || civicArtifacts < 4 || season < 3) return 'rooting';
+  if (wellbeing > 0.82 && ecologicalLoad < 0.58 && civicArtifacts >= 10) return 'flourishing';
+  return 'commonwealth';
+}
+
+function buildCivilizationState(
+  settlements: Settlement[],
+  regions: WorldRegion[],
+  civicArtifacts: number,
+  previous?: Partial<CivilizationState>,
+): CivilizationState {
+  const totals = civilizationTotals(settlements);
+  const season = Math.max(0, Math.floor(finite(previous?.season, 0)));
+  const carryingCapacity = Math.max(24, regions.reduce(
+    (sum, region) => sum + region.radius * 620 * (0.48 + region.vitality * 0.7) * (0.7 + region.openness * 0.3),
+    0,
+  ));
+  const legitimacy = clamp(finite(previous?.legitimacy, mean(settlements.map((item) => item.economy?.belonging ?? item.openness))));
+  const equality = clamp(finite(previous?.equality, Math.min(...NEED_KEYS.map((key) => totals.needs[key]))));
+  return {
+    season,
+    seasonName: SEASON_NAMES[season % SEASON_NAMES.length],
+    seasonProgress: clamp(finite(previous?.seasonProgress, 0)),
+    generation: Math.max(0, Math.floor(finite(previous?.generation, Math.floor(season / 5)))),
+    stage: civilizationStage(totals.population, season, totals.needs, totals.wellbeing, totals.ecologicalLoad, civicArtifacts),
+    population: totals.population,
+    households: Math.max(1, Math.ceil(totals.population / 4.2)),
+    children: Math.max(0, Math.floor(totals.population * 0.22)),
+    elders: Math.max(0, Math.floor(totals.population * 0.11)),
+    laborAvailable: totals.laborAvailable,
+    laborCommitted: totals.laborCommitted,
+    stocks: totals.stocks,
+    production: totals.production,
+    consumption: totals.consumption,
+    needs: totals.needs,
+    housingCapacity: totals.housingCapacity,
+    wellbeing: totals.wellbeing,
+    legitimacy,
+    equality,
+    ecologicalLoad: totals.ecologicalLoad,
+    carryingCapacity,
+    birthsLastSeason: Math.max(0, Math.floor(finite(previous?.birthsLastSeason, 0))),
+    deathsLastSeason: Math.max(0, Math.floor(finite(previous?.deathsLastSeason, 0))),
+    arrivalsLastSeason: Math.max(0, Math.floor(finite(previous?.arrivalsLastSeason, 0))),
+    departuresLastSeason: Math.max(0, Math.floor(finite(previous?.departuresLastSeason, 0))),
+    lastSeasonSummary: typeof previous?.lastSeasonSummary === 'string'
+      ? previous.lastSeasonSummary
+      : 'Three keepers are preparing land, water, and welcome for the first families.',
+    ledger: Array.isArray(previous?.ledger) ? previous.ledger.slice(-24) : [],
+  };
+}
+
 export function createInitialAgency(state: Pick<SimulationState, 'elapsed' | 'seedPhrase'>, rng: SeededRandom): PlayerAgencyState {
   const regions = Array.from({ length: 7 }, (_, index) => createRegion(index, rng));
   connectRegions(regions);
@@ -499,6 +771,9 @@ export function createInitialAgency(state: Pick<SimulationState, 'elapsed' | 'se
     revision: 0,
     glyphSeed: rng.integer(1, 999_999),
   };
+  settlement.economy = createSettlementEconomy(settlement.inhabitants, commons, true);
+  settlement.economy.stocks = materialStocks(34, 28, 30, 16, 7);
+  settlement.economy.housingCapacity = 7;
   const site: CivicSite = {
     id: `site-seed-${rng.state.toString(16)}`,
     title: 'The Empty Center',
@@ -526,9 +801,47 @@ export function createInitialAgency(state: Pick<SimulationState, 'elapsed' | 'se
   firstArrival.urgency = rng.between(0.52, 0.78);
   firstArrival.description = `${firstArrival.partySize} people are visibly walking toward ${commons.name}, carrying skills, needs, disagreements, children, and names the gamemasters have not yet learned.`;
   firstArrival.traits = ['human', 'families', 'far-seed', 'unsettled'];
+  const initialPressureSpecs: Array<{ kind: PressureKind; title: string; detail: string; severity: number; time: number }> = [
+    {
+      kind: 'scarcity',
+      title: 'The first cistern holds twelve dry days',
+      detail: `${commons.name} has people coming and no second water store. Digging, rationing, wetland repair, or migration will each create a different future.`,
+      severity: 0.56,
+      time: 78,
+    },
+    {
+      kind: 'displacement',
+      title: `${firstArrival.partySize} people will arrive before roofs exist`,
+      detail: `The Far-Seed Families need shelter, cooking space, sanitation, and a say in where they live. A welcome without material preparation will fail visibly.`,
+      severity: 0.62,
+      time: firstArrival.timeToArrival,
+    },
+    {
+      kind: 'extraction',
+      title: 'Poison from the old road is moving into the river',
+      detail: `Rain is carrying metal dust from a ruin above ${commons.name}. Water, soil, medicine, and the first settlement all depend on what happens next.`,
+      severity: 0.48,
+      time: 106,
+    },
+  ];
+  const pressures = initialPressureSpecs.map((spec) => {
+    const pressure = createPressure(regions, rng);
+    const data = PRESSURE_DATA[spec.kind];
+    pressure.kind = spec.kind;
+    pressure.title = spec.title;
+    pressure.detail = spec.detail;
+    pressure.focus = data.focus;
+    pressure.opposedQuality = data.opposed;
+    pressure.tags = [spec.kind, 'material', ...data.tags];
+    pressure.severity = spec.severity;
+    pressure.timeToBreach = spec.time;
+    pressure.position = point({ x: commons.position.x + rng.between(-0.1, 0.1), y: commons.position.y + rng.between(-0.08, 0.08) });
+    pressure.affectedIds = [commons.id];
+    return pressure;
+  });
   return {
     resources: resources(72, 62, 74, 66),
-    pressures: [createPressure(regions, rng), createPressure(regions, rng), createPressure(regions, rng)],
+    pressures,
     regions,
     settlements: [settlement],
     inventions: [],
@@ -545,6 +858,7 @@ export function createInitialAgency(state: Pick<SimulationState, 'elapsed' | 'se
     recentlyUsedVerbs: [],
     worldCondition: 'regenerating',
     nanoWorldLines: {},
+    civilization: buildCivilizationState([settlement], regions, 1),
   };
 }
 
@@ -559,11 +873,13 @@ export function normalizeAgencyState(state: SimulationState, rng: SeededRandom):
   const sourceResources = previous.resources as Partial<CivicResourceMap> | undefined;
   const normalizedResources = resourceCopy(fallback.resources);
   for (const key of RESOURCE_KEYS) normalizedResources[key] = clamp(finite(sourceResources?.[key], fallback.resources[key]), 0, 100);
+  const regions = Array.isArray(previous.regions) && previous.regions.length > 0 ? previous.regions : fallback.regions;
+  const settlements = Array.isArray(previous.settlements) ? previous.settlements : fallback.settlements;
   state.agency = {
     resources: normalizedResources,
     pressures: Array.isArray(previous.pressures) ? previous.pressures : fallback.pressures,
-    regions: Array.isArray(previous.regions) && previous.regions.length > 0 ? previous.regions : fallback.regions,
-    settlements: Array.isArray(previous.settlements) ? previous.settlements : fallback.settlements,
+    regions,
+    settlements,
     inventions: Array.isArray(previous.inventions) ? previous.inventions : [],
     charterLaws: Array.isArray(previous.charterLaws) ? previous.charterLaws : [],
     cultures: Array.isArray(previous.cultures) ? previous.cultures : [],
@@ -582,8 +898,19 @@ export function normalizeAgencyState(state: SimulationState, rng: SeededRandom):
     recentlyUsedVerbs: Array.isArray(previous.recentlyUsedVerbs) ? previous.recentlyUsedVerbs.slice(-12) : [],
     worldCondition: previous.worldCondition ?? 'regenerating',
     nanoWorldLines: previous.nanoWorldLines && typeof previous.nanoWorldLines === 'object' ? previous.nanoWorldLines : {},
+    civilization: fallback.civilization,
   };
   connectRegions(state.agency.regions);
+  for (const settlement of state.agency.settlements) {
+    const region = state.agency.regions.find((candidate) => candidate.id === settlement.regionId) ?? state.agency.regions[0]!;
+    normalizeSettlementEconomy(settlement, region);
+  }
+  state.agency.civilization = buildCivilizationState(
+    state.agency.settlements,
+    state.agency.regions,
+    state.agency.inventions.length + state.agency.charterLaws.length + state.agency.cultures.length + state.agency.sites.length,
+    previous.civilization,
+  );
   void rng;
 }
 
@@ -721,6 +1048,25 @@ export function getActionAffordances(state: SimulationState, target?: CivicTarge
 export function previewCivicAction(state: SimulationState, input: CivicActionInput): CivicActionPreview {
   const errors = inputErrors(state, input);
   const cost = CIVIC_VERBS[input.verb] ? computeCost(input) : emptyCost();
+  const materialCost = civicMaterialCost(input.domain, input.intensity, input.verb);
+  const incomingArrival = input.target.kind === 'arrival'
+    ? state.agency.arrivals.find((arrival) => arrival.id === input.target.id && arrival.kind === 'people' && arrival.status === 'approaching')
+    : undefined;
+  const incomingLabor = incomingArrival ? Math.floor(incomingArrival.partySize * 0.34) : 0;
+  const freeLabor = Math.max(
+    0,
+    state.agency.civilization.laborAvailable - state.agency.civilization.laborCommitted + incomingLabor,
+  );
+  const methodLaborFactor = input.method === 'ritual' ? 1.15 : input.method === 'prototype' ? 0.82 : 1;
+  const laborCost = Math.max(1, Math.ceil(DOMAIN_LABOR[input.domain] * input.intensity * methodLaborFactor));
+  const duration = Math.max(8, Math.round(8 + laborCost * 3.2 + (input.method === 'ritual' ? 5 : 0)));
+  if (freeLabor < laborCost) errors.push(`${laborCost} workers are needed; ${freeLabor} are presently free.`);
+  for (const key of MATERIAL_KEYS) {
+    const required = Math.max(0, materialCost[key] ?? 0);
+    if (state.agency.civilization.stocks[key] + 0.001 < required) {
+      errors.push(`${required.toFixed(required % 1 === 0 ? 0 : 1)} ${key} needed; ${state.agency.civilization.stocks[key].toFixed(1)} available.`);
+    }
+  }
   const resourcesAfter = resourceCopy(state.agency.resources);
   for (const key of RESOURCE_KEYS) {
     resourcesAfter[key] = Math.max(0, resourcesAfter[key] - cost[key]);
@@ -773,10 +1119,15 @@ export function previewCivicAction(state: SimulationState, input: CivicActionInp
     novelty: clamp(0.34 + state.knobs.novelty * 0.38 + (recentUses === 0 ? 0.18 : -recentUses * 0.08) + (input.method === 'play' ? 0.12 : 0)),
     predicted,
     creates,
+    laborCost,
+    duration,
+    materialCost,
     consequences: [
-      pressureDelta < 0 ? `${Math.round(Math.abs(pressureDelta) * 100)} pressure may be transformed here.` : 'The act deliberately permits new pressure.',
-      `${QUALITY_META[focus].label} becomes the action's test, not a decorative score.`,
-      input.ally ? `${VOICE_BY_ID[input.ally].shortName} can alter the result through its relationship with ${VOICE_BY_ID[input.lead]?.shortName}.` : 'A lone lead acts faster but carries less relational memory.',
+      `${laborCost} worker${laborCost === 1 ? '' : 's'} will be occupied for about ${duration} world-seconds.`,
+      `${MATERIAL_KEYS.filter((key) => (materialCost[key] ?? 0) !== 0).map((key) => `${Math.abs(materialCost[key] ?? 0).toFixed(1)} ${key}${(materialCost[key] ?? 0) < 0 ? ' recovered' : ''}`).join(', ') || 'No physical stock'} will be committed.`,
+      pressureDelta < 0
+        ? `${Math.round(Math.abs(pressureDelta) * 100)} pressure may be transformed; failure can deepen it.`
+        : `The act accepts new pressure in exchange for ${QUALITY_META[focus].label.toLowerCase()}.`,
     ],
   };
 }
@@ -848,28 +1199,70 @@ function createArtifact(
   let artifactId = '';
 
   if (input.domain === 'habitat') {
-    const settlement: Settlement = {
+    const targetSettlement = input.target.kind === 'settlement'
+      ? state.agency.settlements.find((settlement) => settlement.id === input.target.id)
+      : undefined;
+    if (targetSettlement) {
+      const economy = targetSettlement.economy ?? createSettlementEconomy(targetSettlement.inhabitants, region, true);
+      targetSettlement.economy = economy;
+      economy.housingCapacity += 5 + input.intensity * 7;
+      economy.needs.shelter = clamp(economy.housingCapacity / Math.max(1, targetSettlement.inhabitants), 0, 1.25);
+      targetSettlement.maturity = clamp(targetSettlement.maturity + 0.04 + input.intensity * 0.03);
+      targetSettlement.resilience = clamp(targetSettlement.resilience + (outcome === 'rooted' ? 0.05 : 0.015));
+      targetSettlement.traits.push(
+        input.verb,
+        input.method,
+        `supports:${input.verb === 'shelter' ? 'shelter' : MATERIAL_KEYS[glyphSeed % MATERIAL_KEYS.length]}`,
+      );
+      targetSettlement.revision += 1;
+      artifactId = targetSettlement.id;
+    } else {
+      const origin = [...state.agency.settlements]
+        .filter((settlement) => settlement.inhabitants > 2)
+        .sort((a, b) => distance(a.position, destination) - distance(b.position, destination))[0];
+      const isArrivalShelter = input.target.kind === 'arrival';
+      const migratingPeople = isArrivalShelter || !origin
+        ? 0
+        : Math.min(Math.max(2, input.intensity * 2), Math.max(0, Math.floor(origin.inhabitants * 0.25)));
+      if (origin && migratingPeople > 0) {
+        origin.inhabitants -= migratingPeople;
+        const originRegion = state.agency.regions.find((candidate) => candidate.id === origin.regionId) ?? region;
+        refreshSettlementEconomy(origin, originRegion);
+      }
+      const settlement: Settlement = {
       id: `settlement-${actionId}`,
       name,
       form: rng.pick(['hearth', 'canopy-commons', 'river-fold', 'walking-village', 'threshold-house'] as const),
       regionId: region.id,
       position: destination,
-      inhabitants: 8 + input.intensity * rng.integer(7, 18),
+      inhabitants: migratingPeople,
       maturity,
       resilience: clamp(0.32 + state.agency.resources.vitality / 220 + (outcome === 'rooted' ? 0.12 : -0.04)),
       openness: clamp(0.46 + state.qualities.plurality * 0.35 + (input.verb === 'invite' ? 0.16 : 0)),
       foundedBy: authors,
       bornAt: state.elapsed,
-      description,
-      traits: [input.verb, input.method, outcome],
+      description: migratingPeople > 0
+        ? `${description} ${migratingPeople} people moved here from ${origin?.name ?? 'the commons'}; construction did not create population.`
+        : `${description} The structure is ready, but remains uninhabited until people arrive or choose to move.`,
+      traits: [input.verb, input.method, outcome, 'constructed-habitat', `supports:${input.verb === 'shelter' ? 'shelter' : MATERIAL_KEYS[glyphSeed % MATERIAL_KEYS.length]}`],
       visualDirection,
       source: 'player',
       originActionId: actionId,
       revision: 0,
       glyphSeed,
     };
-    state.agency.settlements.push(settlement);
-    artifactId = settlement.id;
+      settlement.economy = createSettlementEconomy(settlement.inhabitants, region, true);
+      settlement.economy.housingCapacity += 5 + input.intensity * 8;
+      if (settlement.inhabitants === 0) {
+        settlement.economy.stocks = materialStocks();
+        settlement.economy.production = materialStocks();
+        settlement.economy.consumption = materialStocks();
+        settlement.economy.laborAvailable = 0;
+        settlement.economy.laborCommitted = 0;
+      }
+      state.agency.settlements.push(settlement);
+      artifactId = settlement.id;
+    }
   } else if (input.domain === 'invention') {
     const invention: CivicInvention = {
       id: `invention-${actionId}`,
@@ -883,7 +1276,7 @@ function createArtifact(
       createdBy: authors,
       bornAt: state.elapsed,
       description,
-      traits: [input.verb, input.method, outcome],
+      traits: [input.verb, input.method, outcome, `produces:${MATERIAL_KEYS[glyphSeed % MATERIAL_KEYS.length]}`],
       visualDirection,
       source: 'player',
       originActionId: actionId,
@@ -906,7 +1299,7 @@ function createArtifact(
       bornAt: state.elapsed,
       amendments: 0,
       description,
-      traits: [input.verb, input.method, outcome],
+      traits: [input.verb, input.method, outcome, `protects:${NEED_KEYS[glyphSeed % NEED_KEYS.length]}`],
       visualDirection,
       source: 'player',
       originActionId: actionId,
@@ -928,7 +1321,7 @@ function createArtifact(
       bornAt: state.elapsed,
       mutations: 0,
       description,
-      traits: [input.verb, input.method, outcome],
+      traits: [input.verb, input.method, outcome, `practices:${NEED_KEYS[glyphSeed % NEED_KEYS.length]}`],
       visualDirection,
       source: 'player',
       originActionId: actionId,
@@ -972,6 +1365,17 @@ function amendOrCompostTarget(state: SimulationState, input: CivicActionInput, o
     settlement.maturity = clamp(settlement.maturity + amount);
     settlement.resilience = clamp(settlement.resilience + (input.verb === 'compost' ? -0.2 : amount * 0.6));
     settlement.traits.push(input.verb === 'compost' ? 'returning' : 'amended');
+    if (settlement.economy) {
+      if (input.verb === 'compost') {
+        settlement.economy.stocks.materials += Math.max(2, settlement.economy.housingCapacity * 0.08);
+        settlement.economy.housingCapacity = Math.max(settlement.inhabitants * 0.55, settlement.economy.housingCapacity * 0.82);
+        settlement.economy.ecologicalLoad = clamp(settlement.economy.ecologicalLoad - 0.12, 0, 1.5);
+      } else {
+        settlement.economy.housingCapacity += 4 + input.intensity * 5;
+        settlement.economy.needs.shelter = clamp(settlement.economy.housingCapacity / Math.max(1, settlement.inhabitants));
+        settlement.economy.needs.care = clamp(settlement.economy.needs.care + 0.04 * input.intensity);
+      }
+    }
     settlement.revision += 1;
     ids.push(settlement.id);
   }
@@ -1048,6 +1452,11 @@ function settleHumanArrival(
     }
     existing.maturity = clamp(existing.maturity + (welcomed ? 0.12 : 0.045));
     existing.openness = clamp(existing.openness + (welcomed ? 0.08 : -0.025));
+    const region = state.agency.regions.find((candidate) => candidate.id === existing.regionId) ?? nearestRegion(state, existing.position);
+    refreshSettlementEconomy(existing, region);
+    existing.economy!.stocks.water += arrival.partySize * 0.8;
+    existing.economy!.stocks.food += arrival.partySize * 0.65;
+    existing.economy!.needs.shelter = clamp(existing.economy!.housingCapacity / Math.max(1, existing.inhabitants));
     return existing;
   }
   const region = state.agency.regions.find((candidate) => candidate.id === arrival.regionId) ?? nearestRegion(state, arrival.destination);
@@ -1073,6 +1482,7 @@ function settleHumanArrival(
     revision: 0,
     glyphSeed: rng.integer(1, 999_999),
   };
+  settlement.economy = createSettlementEconomy(settlement.inhabitants, region, welcomed);
   state.agency.settlements.push(settlement);
   return settlement;
 }
@@ -1148,6 +1558,39 @@ function materializeWork(
   return work;
 }
 
+function commitCivilizationResources(
+  state: SimulationState,
+  preview: CivicActionPreview,
+  targetPosition: SpatialPoint,
+): void {
+  const settlements = [...state.agency.settlements]
+    .filter((settlement) => settlement.economy)
+    .sort((a, b) => distance(a.position, targetPosition) - distance(b.position, targetPosition));
+  for (const key of MATERIAL_KEYS) {
+    let remaining = preview.materialCost[key] ?? 0;
+    if (remaining < 0) {
+      if (settlements[0]?.economy) settlements[0].economy!.stocks[key] += Math.abs(remaining);
+      continue;
+    }
+    for (const settlement of settlements) {
+      if (remaining <= 0) break;
+      const economy = settlement.economy!;
+      const taken = Math.min(economy.stocks[key], remaining);
+      economy.stocks[key] -= taken;
+      remaining -= taken;
+    }
+  }
+  let laborRemaining = preview.laborCost;
+  for (const settlement of settlements) {
+    if (laborRemaining <= 0) break;
+    const economy = settlement.economy!;
+    const free = Math.max(0, economy.laborAvailable - economy.laborCommitted);
+    const committed = Math.min(free, laborRemaining);
+    economy.laborCommitted += committed;
+    laborRemaining -= committed;
+  }
+}
+
 export function performCivicAction(state: SimulationState, input: CivicActionInput, rng: SeededRandom): CivicActionResult | null {
   const preview = previewCivicAction(state, input);
   if (!preview.valid) return null;
@@ -1160,9 +1603,11 @@ export function performCivicAction(state: SimulationState, input: CivicActionInp
       : 'ruptured';
   const actionId = `action-${state.epoch}-${state.cycle + 1}-${rng.state.toString(16)}`;
   const targetPosition = artifactPosition(state, input.target) ?? { x: 0.5, y: 0.5 };
+  commitCivilizationResources(state, preview, targetPosition);
   const qualityFactor = outcome === 'rooted' ? 1 : outcome === 'contested' ? 0.48 : -0.4;
   for (const key of QUALITY_KEYS) state.qualities[key] = clamp(state.qualities[key] + preview.qualityDelta[key] * qualityFactor, 0.05, 0.98);
   const sideEffects = [...preview.warnings];
+  sideEffects.push(`${preview.laborCost} workers and physical stocks were committed; the settlement economy now carries the cost.`);
   applyPressureAction(state, input, outcome, preview, sideEffects);
   updateRelationship(state, input, outcome);
   let createdIds: string[] = [];
@@ -1195,6 +1640,8 @@ export function performCivicAction(state: SimulationState, input: CivicActionInp
     if (input.verb === 'shelter' || input.verb === 'invite') {
       arrival.status = outcome === 'ruptured' ? 'diverted' : 'settled';
       if (outcome !== 'ruptured') {
+        const settledSeason = `settled-season:${state.agency.civilization.season}`;
+        if (!arrival.traits.includes(settledSeason)) arrival.traits.push(settledSeason);
         const settlement = settleHumanArrival(state, arrival, actionId, rng, true);
         if (settlement && !createdIds.includes(settlement.id)) createdIds.push(settlement.id);
         sideEffects.push(`${arrival.name} became visible inhabitants of ${settlement?.name ?? nearestRegion(state, arrival.destination).name}.`);
@@ -1248,24 +1695,283 @@ export function performCivicAction(state: SimulationState, input: CivicActionInp
   state.agency.recentlyUsedVerbs.push(input.verb);
   if (state.agency.recentlyUsedVerbs.length > 12) state.agency.recentlyUsedVerbs.splice(0, state.agency.recentlyUsedVerbs.length - 12);
   state.agency.variety = clamp(new Set(state.agency.recentlyUsedVerbs).size / 7 + Math.min(0.2, state.agency.actionHistory.length / 100));
+  refreshCivilizationTotals(state);
   return result;
 }
 
 export interface AgencyWorldEvent {
-  kind: 'pressure-born' | 'pressure-split' | 'breach' | 'arrival' | 'settlement' | 'mutation';
+  kind: 'pressure-born' | 'pressure-split' | 'breach' | 'arrival' | 'settlement' | 'mutation' | 'season' | 'population';
   id: string;
   title: string;
   detail: string;
+}
+
+function traitValue(traits: string[], prefix: string): string | null {
+  const trait = traits.find((candidate) => candidate.startsWith(`${prefix}:`));
+  return trait ? trait.slice(prefix.length + 1) : null;
+}
+
+function localArtifactEffects(state: SimulationState, settlement: Settlement): {
+  production: MaterialStockMap;
+  needs: BasicNeedMap;
+  housing: number;
+  ecologicalRisk: number;
+} {
+  const production = materialStocks(1, 1, 1, 1, 1);
+  const needs = basicNeeds(0, 0, 0, 0, 0);
+  let housing = 0;
+  let ecologicalRisk = 0;
+  for (const invention of state.agency.inventions.filter((item) => item.regionId === settlement.regionId)) {
+    const specialty = traitValue(invention.traits, 'produces') as keyof MaterialStockMap | null;
+    if (specialty && MATERIAL_KEYS.includes(specialty)) {
+      production[specialty] += invention.maturity * invention.reliability * 0.34;
+    }
+    ecologicalRisk += invention.risk * invention.maturity * 0.08;
+  }
+  for (const law of state.agency.charterLaws.filter((item) => item.regionId === settlement.regionId && item.strength > 0.08)) {
+    const protectedNeed = traitValue(law.traits, 'protects') as keyof BasicNeedMap | null;
+    if (protectedNeed && NEED_KEYS.includes(protectedNeed)) {
+      needs[protectedNeed] += law.strength * law.contestability * 0.13;
+    }
+  }
+  for (const culture of state.agency.cultures.filter((item) => item.regionId === settlement.regionId && item.adoption > 0.08)) {
+    const practicedNeed = traitValue(culture.traits, 'practices') as keyof BasicNeedMap | null;
+    if (practicedNeed && NEED_KEYS.includes(practicedNeed)) {
+      needs[practicedNeed] += culture.adoption * culture.diversity * 0.12;
+    }
+  }
+  for (const site of state.agency.sites.filter((item) => item.regionId === settlement.regionId && item.status !== 'dormant')) {
+    const force = site.intensity * (site.status === 'living' ? 1 : 0.55);
+    if (site.kind === 'garden') production.food += force * 0.18;
+    if (site.kind === 'workshop') production.materials += force * 0.15;
+    if (site.kind === 'crossing') production.water += force * 0.12;
+    if (site.kind === 'sanctuary') {
+      production.medicine += force * 0.12;
+      needs.care += force * 0.1;
+      housing += force * 5;
+    }
+    if (site.kind === 'assembly' || site.kind === 'archive') needs.belonging += force * site.permeability * 0.09;
+    if (site.kind === 'threshold') needs.shelter += force * 0.04;
+  }
+  return { production, needs, housing, ecologicalRisk };
+}
+
+function stepSettlementEconomy(state: SimulationState, settlement: Settlement, region: WorldRegion, seconds: number): void {
+  refreshSettlementEconomy(settlement, region);
+  const economy = settlement.economy!;
+  const effects = localArtifactEffects(state, settlement);
+  const availableLabor = Math.max(1, economy.laborAvailable);
+  const freeLabor = clamp((availableLabor - economy.laborCommitted) / availableLabor, 0.18, 1);
+  const cooperation = 0.72 + state.qualities.reciprocity * 0.18 + economy.belonging * 0.1;
+  for (const key of MATERIAL_KEYS) {
+    const production = economy.production[key] * effects.production[key] * (0.78 + freeLabor * 0.22) * cooperation;
+    const consumption = economy.consumption[key];
+    const net = production - consumption;
+    economy.production[key] = production;
+    economy.lastNet[key] = net;
+    const stockCapacity = Math.max(12, settlement.inhabitants * (key === 'water' ? 8 : key === 'food' ? 7 : 4.5));
+    economy.stocks[key] = clamp(economy.stocks[key] + net * seconds, 0, stockCapacity);
+  }
+  economy.housingCapacity = Math.max(economy.housingCapacity, settlement.inhabitants * settlement.maturity * 0.72) + effects.housing * seconds * 0.002;
+  const buffer = (key: keyof MaterialStockMap): number => economy.stocks[key] / Math.max(0.01, economy.consumption[key] * 22);
+  economy.needs.water = clamp(economy.production.water / Math.max(0.01, economy.consumption.water) * 0.64 + buffer('water') * 0.36 + effects.needs.water, 0, 1.25);
+  economy.needs.food = clamp(economy.production.food / Math.max(0.01, economy.consumption.food) * 0.64 + buffer('food') * 0.36 + effects.needs.food, 0, 1.25);
+  economy.needs.shelter = clamp(economy.housingCapacity / Math.max(1, settlement.inhabitants) + effects.needs.shelter, 0, 1.25);
+  const medicineCoverage = economy.production.medicine / Math.max(0.01, economy.consumption.medicine) * 0.5 + buffer('medicine') * 0.2;
+  economy.needs.care = clamp(0.32 + medicineCoverage + state.qualities.reciprocity * 0.16 + effects.needs.care, 0, 1.25);
+  economy.belonging = clamp(economy.belonging + (settlement.openness + state.qualities.agency + state.qualities.plurality - 1.5) * seconds * 0.0006, 0, 1);
+  economy.needs.belonging = clamp(economy.belonging + effects.needs.belonging, 0, 1.25);
+  const minimumNeed = Math.min(...NEED_KEYS.map((key) => economy.needs[key]));
+  economy.health = clamp(economy.health + (mean(NEED_KEYS.map((key) => economy.needs[key])) - 0.72) * seconds * 0.0014 - Math.max(0, 0.48 - minimumNeed) * seconds * 0.002, 0, 1);
+  economy.ecologicalLoad = clamp(
+    settlement.inhabitants / Math.max(24, region.radius * 780) * 0.38
+      + economy.production.materials * 0.014
+      + economy.production.energy * 0.01
+      + effects.ecologicalRisk
+      - state.qualities.biosphere * 0.16,
+    0,
+    1.5,
+  );
+  region.vitality = clamp(region.vitality + (0.42 - economy.ecologicalLoad - region.pressure * 0.3) * seconds * 0.00022, 0.05, 0.98);
+  settlement.resilience = clamp(settlement.resilience + (minimumNeed + economy.health - 1.2) * seconds * 0.0003, 0.05, 0.98);
+  economy.laborCommitted = Math.max(0, economy.laborCommitted - seconds * Math.max(0.1, economy.laborAvailable * 0.022));
+}
+
+function lowestCivilizationNeed(civilization: CivilizationState): keyof BasicNeedMap {
+  return [...NEED_KEYS].sort((a, b) => civilization.needs[a] - civilization.needs[b])[0] ?? 'water';
+}
+
+function materialPressure(
+  state: SimulationState,
+  rng: SeededRandom,
+  need = lowestCivilizationNeed(state.agency.civilization),
+): CivicPressureFront {
+  const settlements = [...state.agency.settlements].sort((a, b) => {
+    const aNeed = a.economy?.needs[need] ?? 1;
+    const bNeed = b.economy?.needs[need] ?? 1;
+    return aNeed - bNeed;
+  });
+  const settlement = settlements[0];
+  const region = settlement
+    ? state.agency.regions.find((candidate) => candidate.id === settlement.regionId) ?? state.agency.regions[0]!
+    : state.agency.regions[0]!;
+  const specs: Record<keyof BasicNeedMap, { kind: PressureKind; title: string; detail: string }> = {
+    water: {
+      kind: 'scarcity',
+      title: `${region.name}'s drinkable water is falling behind its people`,
+      detail: `${Math.round(state.agency.civilization.stocks.water)} water remains for ${state.agency.civilization.population} people. Catchment, rationing, repair, relocation, and watershed restoration distribute the cost differently.`,
+    },
+    food: {
+      kind: 'scarcity',
+      title: `${region.name} is eating seed meant for the next season`,
+      detail: `Food coverage is ${Math.round(state.agency.civilization.needs.food * 100)}%. More fields could feed people now while reducing habitat; trade, diet, storage, and migration make different promises.`,
+    },
+    shelter: {
+      kind: 'displacement',
+      title: `${Math.max(0, state.agency.civilization.population - Math.floor(state.agency.civilization.housingCapacity))} people have no weather-safe room`,
+      detail: `Shelter capacity is ${Math.floor(state.agency.civilization.housingCapacity)} for ${state.agency.civilization.population} people. Building, sharing, moving, or limiting arrival will reshape who belongs.`,
+    },
+    care: {
+      kind: 'silence',
+      title: `Care work in ${region.name} has exceeded the hands available`,
+      detail: `Illness, children, elders, and exhaustion are competing for the same hours. Medicine alone cannot solve a labor and dignity decision.`,
+    },
+    belonging: {
+      kind: 'fracture',
+      title: `${settlement?.name ?? region.name} is losing people who no longer feel heard`,
+      detail: `Belonging is ${Math.round(state.agency.civilization.needs.belonging * 100)}%. A law, ritual, assembly, refusal, or departure will change the settlement's future population.`,
+    },
+  };
+  const spec = specs[need];
+  const pressure = createPressure(state.agency.regions, rng);
+  const data = PRESSURE_DATA[spec.kind];
+  pressure.kind = spec.kind;
+  pressure.title = spec.title;
+  pressure.detail = spec.detail;
+  pressure.focus = data.focus;
+  pressure.opposedQuality = data.opposed;
+  pressure.position = point(settlement?.position, region.position);
+  pressure.affectedIds = settlement ? [region.id, settlement.id] : [region.id];
+  pressure.tags = [spec.kind, 'systemic', `need:${need}`, ...data.tags];
+  pressure.severity = clamp(1.02 - state.agency.civilization.needs[need] + 0.18, 0.28, 0.9);
+  pressure.timeToBreach = CIVILIZATION_SEASON_SECONDS * (0.68 + state.agency.civilization.needs[need] * 0.3);
+  return pressure;
+}
+
+function advanceCivilizationSeason(state: SimulationState, rng: SeededRandom, events: AgencyWorldEvent[]): void {
+  const civilization = state.agency.civilization;
+  let births = 0;
+  let deaths = 0;
+  let departures = 0;
+  for (const settlement of state.agency.settlements) {
+    const region = state.agency.regions.find((candidate) => candidate.id === settlement.regionId);
+    if (!region || !settlement.economy) continue;
+    const economy = settlement.economy;
+    const minimumNeed = Math.min(...NEED_KEYS.map((key) => economy.needs[key]));
+    const room = Math.max(0, economy.housingCapacity - settlement.inhabitants);
+    const localBirths = Math.min(
+      Math.floor(room),
+      Math.max(0, Math.floor(settlement.inhabitants * 0.026 * economy.health * Math.min(1, minimumNeed) + rng.next() * 0.8)),
+    );
+    const localDeaths = Math.max(0, Math.floor(
+      settlement.inhabitants * (0.004 + Math.max(0, 0.62 - minimumNeed) * 0.045 + Math.max(0, 0.48 - economy.health) * 0.025)
+      + rng.next() * 0.5,
+    ));
+    const localDepartures = Math.max(0, Math.floor(
+      settlement.inhabitants * Math.max(0, 0.5 - economy.needs.belonging) * 0.08 + rng.next() * 0.35,
+    ));
+    settlement.inhabitants = Math.max(1, settlement.inhabitants + localBirths - localDeaths - localDepartures);
+    births += localBirths;
+    deaths += localDeaths;
+    departures += localDepartures;
+    refreshSettlementEconomy(settlement, region);
+  }
+  const arrivals = state.agency.arrivals
+    .filter((arrival) => arrival.kind === 'people' && arrival.status === 'settled' && arrival.traits.includes(`settled-season:${civilization.season}`))
+    .reduce((sum, arrival) => sum + arrival.partySize, 0);
+  const totals = civilizationTotals(state.agency.settlements);
+  civilization.season += 1;
+  civilization.seasonName = SEASON_NAMES[civilization.season % SEASON_NAMES.length];
+  civilization.generation = Math.floor(civilization.season / SEASON_NAMES.length);
+  civilization.birthsLastSeason = births;
+  civilization.deathsLastSeason = deaths;
+  civilization.arrivalsLastSeason = arrivals;
+  civilization.departuresLastSeason = departures;
+  const lowestNeed = [...NEED_KEYS].sort((a, b) => totals.needs[a] - totals.needs[b])[0] ?? 'water';
+  civilization.lastSeasonSummary = `${SEASON_NAMES[(civilization.season - 1) % SEASON_NAMES.length]} ended with ${totals.population} people: ${births} born, ${deaths} died, ${departures} departed. ${lowestNeed} is the least-secure need at ${Math.round(totals.needs[lowestNeed] * 100)}%.`;
+  civilization.ledger.push({
+    season: civilization.season,
+    generation: civilization.generation,
+    name: SEASON_NAMES[(civilization.season - 1) % SEASON_NAMES.length],
+    population: totals.population,
+    births,
+    deaths,
+    arrivals,
+    departures,
+    lowestNeed,
+    summary: civilization.lastSeasonSummary,
+  });
+  if (civilization.ledger.length > 24) civilization.ledger.splice(0, civilization.ledger.length - 24);
+  events.push({
+    kind: 'season',
+    id: `season-${civilization.season}`,
+    title: `${civilization.seasonName} begins with ${totals.population} people`,
+    detail: civilization.lastSeasonSummary,
+  });
+  if (births + deaths + departures > 0) {
+    events.push({
+      kind: 'population',
+      id: `population-${civilization.season}`,
+      title: `${births} born · ${deaths} died · ${departures} departed`,
+      detail: `Population change followed water, food, shelter, care, health, and belonging—not a scripted story beat.`,
+    });
+  }
+  refreshCivilizationTotals(state);
+  const activeForNeed = state.agency.pressures.some((pressure) => pressure.state === 'active' && pressure.tags.includes(`need:${lowestNeed}`));
+  if (totals.needs[lowestNeed] < 0.84 && !activeForNeed && state.agency.pressures.length < 7) {
+    const pressure = materialPressure(state, rng, lowestNeed);
+    state.agency.pressures.push(pressure);
+    events.push({ kind: 'pressure-born', id: pressure.id, title: pressure.title, detail: pressure.detail });
+  }
+}
+
+function refreshCivilizationTotals(state: SimulationState): void {
+  const previous = state.agency.civilization;
+  const totals = civilizationTotals(state.agency.settlements);
+  const civicArtifacts = state.agency.inventions.length + state.agency.charterLaws.length + state.agency.cultures.length + state.agency.sites.length;
+  const carryingCapacity = Math.max(24, state.agency.regions.reduce(
+    (sum, region) => sum + region.radius * 620 * (0.48 + region.vitality * 0.7) * (0.7 + region.openness * 0.3),
+    0,
+  ));
+  previous.population = totals.population;
+  previous.households = Math.max(1, Math.ceil(totals.population / 4.2));
+  previous.children = Math.max(0, Math.floor(totals.population * 0.22));
+  previous.elders = Math.max(0, Math.floor(totals.population * 0.11));
+  previous.laborAvailable = totals.laborAvailable;
+  previous.laborCommitted = totals.laborCommitted;
+  previous.stocks = totals.stocks;
+  previous.production = totals.production;
+  previous.consumption = totals.consumption;
+  previous.needs = totals.needs;
+  previous.housingCapacity = totals.housingCapacity;
+  previous.wellbeing = totals.wellbeing;
+  previous.ecologicalLoad = totals.ecologicalLoad;
+  previous.carryingCapacity = carryingCapacity;
+  previous.legitimacy = clamp(previous.legitimacy + (state.agency.resources.trust / 100 - previous.legitimacy) * 0.012);
+  previous.equality = clamp(previous.equality + (Math.min(...NEED_KEYS.map((key) => totals.needs[key])) - previous.equality) * 0.02);
+  previous.stage = civilizationStage(totals.population, previous.season, totals.needs, totals.wellbeing, totals.ecologicalLoad, civicArtifacts);
 }
 
 function updateWorldCondition(state: SimulationState): void {
   const active = state.agency.pressures.filter((pressure) => pressure.state === 'active' || pressure.state === 'breached');
   const pressure = active.length > 0 ? mean(active.map((item) => item.severity)) : 0;
   const reserve = mean(RESOURCE_KEYS.map((key) => state.agency.resources[key] / 100));
+  const civilization = state.agency.civilization;
+  const lowestNeed = Math.min(...NEED_KEYS.map((key) => civilization.needs[key]));
   let condition: WorldCondition;
-  if (pressure > 0.72 || reserve < 0.2) condition = 'fracturing';
-  else if (pressure > 0.5 || reserve < 0.38) condition = 'strained';
-  else if (state.agency.authoredActions > 4 && pressure < 0.3 && reserve > 0.55) condition = 'flourishing';
+  if (civilization.stage === 'fracture' || pressure > 0.72 || reserve < 0.2 || lowestNeed < 0.28) condition = 'fracturing';
+  else if (civilization.stage === 'survival' || pressure > 0.5 || reserve < 0.38 || lowestNeed < 0.62) condition = 'strained';
+  else if (civilization.stage === 'flourishing' && pressure < 0.35 && reserve > 0.5) condition = 'flourishing';
   else condition = 'regenerating';
   state.agency.worldCondition = condition;
 }
@@ -1327,6 +2033,8 @@ export function stepAgencyWorld(state: SimulationState, rng: SeededRandom, secon
     if (arrival.timeToArrival <= 0) {
       arrival.status = 'settled';
       arrival.revision += 1;
+      const settledSeason = `settled-season:${state.agency.civilization.season}`;
+      if (!arrival.traits.includes(settledSeason)) arrival.traits.push(settledSeason);
       const region = state.agency.regions.find((item) => item.id === arrival.regionId) ?? nearestRegion(state, arrival.destination);
       region.openness = clamp(region.openness + 0.04 - arrival.urgency * 0.03);
       for (const gift of arrival.gifts) state.qualities[gift] = clamp(state.qualities[gift] + 0.012);
@@ -1347,10 +2055,8 @@ export function stepAgencyWorld(state: SimulationState, rng: SeededRandom, secon
   for (const settlement of state.agency.settlements) {
     const region = state.agency.regions.find((item) => item.id === settlement.regionId);
     if (!region) continue;
+    stepSettlementEconomy(state, settlement, region, seconds);
     settlement.maturity = clamp(settlement.maturity + 0.00012 * seconds * settlement.resilience);
-    settlement.resilience = clamp(settlement.resilience + (region.vitality - region.pressure - 0.25) * 0.00008 * seconds);
-    const growth = settlement.resilience > 0.52 && region.pressure < 0.55 ? seconds * settlement.openness * 0.002 : -seconds * region.pressure * 0.001;
-    settlement.inhabitants = Math.max(1, Math.round(settlement.inhabitants + growth));
     const site = state.agency.sites.find((item) => item.originActionId === settlement.originActionId);
     if (site && site.status === 'growing' && settlement.maturity > 0.48) site.status = 'living';
   }
@@ -1365,9 +2071,18 @@ export function stepAgencyWorld(state: SimulationState, rng: SeededRandom, secon
     law.strength = clamp(law.strength + (law.contestability - 0.5) * 0.00004 * seconds);
   }
 
+  state.agency.civilization.seasonProgress += seconds / CIVILIZATION_SEASON_SECONDS;
+  while (state.agency.civilization.seasonProgress >= 1) {
+    state.agency.civilization.seasonProgress -= 1;
+    refreshCivilizationTotals(state);
+    advanceCivilizationSeason(state, rng, events);
+  }
+  refreshCivilizationTotals(state);
+
   state.agency.pressures = state.agency.pressures.filter((pressure) => pressure.state !== 'transformed' || rng.next() > 0.018 * seconds);
-  if (state.agency.pressures.length < 3 || (state.agency.pressures.length < 6 && rng.next() < 0.014 * seconds)) {
-    const pressure = createPressure(state.agency.regions, rng);
+  const activePressures = state.agency.pressures.filter((pressure) => pressure.state === 'active' || pressure.state === 'breached');
+  if (activePressures.length < 2) {
+    const pressure = materialPressure(state, rng);
     state.agency.pressures.push(pressure);
     events.push({ kind: 'pressure-born', id: pressure.id, title: pressure.title, detail: pressure.detail });
   }

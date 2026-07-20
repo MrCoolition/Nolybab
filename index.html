@@ -3,251 +3,161 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta
-      name="description"
-      content="Nolybab: Reverse Babylon — an infinite civilization of plural voices, productive mistakes, and living memory."
-    />
-    <meta name="theme-color" content="#0b1210" />
-    <title>Nolybab — Reverse Babylon</title>
+    <meta name="description" content="Nolybab — a living civilization shaped by human choice and GPT-5.4 Nano." />
+    <meta name="theme-color" content="#07100d" />
+    <title>Nolybab — A New Civilization</title>
   </head>
   <body>
     <main id="app" class="app-shell">
-      <section id="world-shell" class="world-shell" aria-label="The living civic organism of Nolybab">
-        <div id="game-canvas" class="game-canvas" role="img" aria-label="An evolving network of cultures, shared meanings, and remembered mistakes"></div>
+      <section id="world-shell" class="world-shell" aria-label="The living world of Nolybab">
+        <div id="game-canvas" class="game-canvas" role="img" aria-label="Settlements, people, living laws, cultures, inventions, habitats, and pressures evolving across Nolybab"></div>
         <div class="atmosphere" aria-hidden="true"></div>
 
-        <header class="identity-cluster" aria-label="Civilization identity">
-          <p class="eyebrow">Reverse Babylon · living simulation</p>
-          <div class="wordmark-row">
-            <h1>Nolybab</h1>
-            <span id="breath-mark" class="breath-mark" aria-label="World is breathing"></span>
+        <header class="civ-header" aria-label="Nolybab civilization status">
+          <div class="identity-cluster">
+            <div class="wordmark-row"><h1>Nolybab</h1><span id="breath-mark" class="breath-mark" aria-label="World is breathing"></span></div>
+            <div class="epoch-row"><span id="epoch-label" class="epoch-label">Seed epoch · pulse 0</span><span id="archive-status" class="archive-status" data-status="local"><i></i> local memory</span></div>
           </div>
-          <p id="epoch-label" class="epoch-label">Seed epoch · pulse 0</p>
-          <p id="archive-status" class="archive-status" data-status="local"><i></i> local memory</p>
+
+          <div class="civilization-stats" aria-label="Civilization census">
+            <span><b id="stat-population">3</b><small>people</small></span>
+            <span><b id="stat-settlements">1</b><small>settlement</small></span>
+            <span><b id="stat-laws">0</b><small>laws</small></span>
+            <span><b id="stat-cultures">0</b><small>practices</small></span>
+            <span><b id="stat-inventions">0</b><small>inventions</small></span>
+          </div>
+
+          <div class="resource-strip" aria-label="Civic resources">
+            <span data-resource="attention"><i></i><b id="resource-attention">72</b><small>attention</small></span>
+            <span data-resource="trust"><i></i><b id="resource-trust">62</b><small>trust</small></span>
+            <span data-resource="vitality"><i></i><b id="resource-vitality">74</b><small>vitality</small></span>
+            <span data-resource="possibility"><i></i><b id="resource-possibility">66</b><small>possibility</small></span>
+          </div>
+
+          <aside class="civic-knot" aria-label="Civic vital signs">
+            <button id="knot-toggle" class="knot-button" aria-label="Civic health" aria-expanded="false" aria-controls="quality-list">
+              <span id="knot-glyph" class="knot-glyph" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>health</span>
+            </button>
+            <div id="quality-list" class="quality-list"></div>
+          </aside>
+
+          <nav class="world-controls" aria-label="Simulation controls">
+            <button id="pause-button" class="glyph-button" type="button" aria-label="Pause simulation" title="Pause">Ⅱ</button>
+            <button id="speed-button" class="glyph-button speed-button" type="button" aria-label="Simulation speed" title="Change speed">1×</button>
+            <button id="sound-button" class="glyph-button" type="button" aria-label="Enable sound" title="Sound">◌</button>
+          </nav>
         </header>
 
-        <section id="question-cluster" class="question-cluster" aria-live="polite">
-          <div class="question-origin">
-            <span id="director-sigil" class="director-sigil"></span>
-            <span id="question-origin">The Chorus is listening</span>
-            <span id="pulse-clock">∞</span>
-          </div>
-          <div class="pressure-heading">
-            <span class="pressure-label">Pressure</span>
-            <h2 id="question-title">The first living question is forming</h2>
-          </div>
-          <p id="question-situation">Every civilization begins by deciding what it is willing to hear.</p>
-          <p id="question-prompt" class="question-prompt">Choose two unlike voices.</p>
+        <section id="question-cluster" class="question-cluster now-panel" aria-live="polite">
+          <div class="now-kicker"><span id="director-sigil" class="director-sigil"></span><strong>NOW</strong><span id="question-origin">The world is waking</span><time id="pulse-clock">∞</time></div>
+          <h2 id="question-title">The first people are approaching.</h2>
+          <p id="question-situation">They need somewhere to arrive and the right to shape what comes next.</p>
+          <p id="question-prompt" class="question-prompt">Nano is asking what they carry.</p>
+          <article id="human-arrival-panel" class="human-arrival" aria-label="Human arrival">
+            <div class="human-count"><b id="arrival-people">0</b><span>people</span></div>
+            <div class="human-copy"><strong id="arrival-name">No one on the road</strong><p id="arrival-description">The paths are listening.</p><div id="arrival-needs" class="arrival-needs"></div></div>
+            <time id="arrival-eta">—</time>
+          </article>
         </section>
 
-        <aside class="civic-knot" aria-label="Civic vital signs">
-          <button id="knot-toggle" class="knot-button" aria-label="Civic knot" aria-expanded="false" aria-controls="quality-list">
-            <span id="knot-glyph" class="knot-glyph" aria-hidden="true">
-              <i></i><i></i><i></i><i></i>
-            </span>
-            <span>civic knot</span>
-          </button>
-          <div id="quality-list" class="quality-list"></div>
-        </aside>
-
-        <nav class="world-controls" aria-label="Simulation controls">
-          <button id="pause-button" class="glyph-button" type="button" aria-label="Pause simulation" title="Pause">Ⅱ</button>
-          <button id="speed-button" class="glyph-button speed-button" type="button" aria-label="Simulation speed" title="Change speed">1×</button>
-          <button id="sound-button" class="glyph-button" type="button" aria-label="Enable generative sound" title="Sound">◌</button>
-        </nav>
-
-        <section id="voice-dock" class="voice-dock council-surface command-deck" aria-label="Author a civic action">
-          <header class="council-cycle command-status">
-            <div class="command-heading">
-              <span>Your move</span>
-              <strong id="stage-instruction">Choose what changes, where it lands, and who makes it real.</strong>
-            </div>
+        <section id="voice-dock" class="voice-dock action-dock" data-mode="choices" aria-label="Choose Nolybab's next move">
+          <header class="action-dock-header">
+            <div class="nano-heading"><span id="nano-status" class="nano-status" data-status="quiet"><i></i> Nano gamemasters</span><strong id="stage-instruction">Three ways forward are being imagined.</strong></div>
             <ol id="cycle-steps" aria-label="World response cycle">
-              <li data-phase="pressure"><b>01</b><span>Pressure</span></li>
-              <li data-phase="council"><b>02</b><span>Council</span></li>
-              <li data-phase="decision"><b>03</b><span>Decide</span></li>
-              <li data-phase="action"><b>04</b><span>Act</span></li>
-              <li data-phase="growth"><b>05</b><span>Grow</span></li>
+              <li data-phase="pressure"><b>1</b><span>Pressure</span></li><li data-phase="council"><b>2</b><span>Choose</span></li><li data-phase="decision"><b>3</b><span>Decide</span></li><li data-phase="action"><b>4</b><span>Act</span></li><li data-phase="growth"><b>5</b><span>Grow</span></li>
             </ol>
-            <div class="command-interrupts">
-              <button id="interrupt-button" class="interrupt-button" type="button" aria-label="Interrupt autonomous pressure">Hold world</button>
-              <button id="reshape-button" class="reshape-button" type="button" aria-label="Reshape pressure toward another place" aria-pressed="false">Reshape pressure</button>
-              <span id="nano-status" class="nano-status" data-status="quiet"><i></i> Nano atelier</span>
-            </div>
+            <div class="command-interrupts"><button id="interrupt-button" class="interrupt-button" type="button">Hold world</button><button id="reshape-button" class="reshape-button" type="button" aria-pressed="false">Reshape pressure</button></div>
           </header>
 
-          <div class="council-body command-workbench">
-            <section class="command-lane command-domain-lane" aria-labelledby="command-domain-label">
-              <div class="command-lane-heading"><b>1</b><span id="command-domain-label">Make</span></div>
-              <div id="command-domain" class="command-domain" role="group" aria-label="Kind of civic change">
-                <button type="button" data-domain="law" aria-pressed="true"><i>§</i><span>Law</span></button>
-                <button type="button" data-domain="culture" aria-pressed="false"><i>◎</i><span>Culture</span></button>
-                <button type="button" data-domain="invention" aria-pressed="false"><i>✦</i><span>Invention</span></button>
-                <button type="button" data-domain="habitat" aria-pressed="false"><i>⌂</i><span>Build</span></button>
-              </div>
-            </section>
-
-            <section class="command-lane command-target-lane" aria-labelledby="command-target-label">
-              <div class="command-lane-heading"><b>2</b><span id="command-target-label">Target</span></div>
-              <div id="command-targets" class="command-targets" role="listbox" aria-label="Action target">
-                <button type="button" role="option" data-target-kind="pressure" aria-selected="true">Current pressure</button>
-              </div>
-            </section>
-
-            <section class="command-lane council-choosing" aria-labelledby="coalition-label">
-              <div class="command-lane-heading"><b>3</b><span id="coalition-label">People</span></div>
-              <div class="selection-copy">
-                <div id="selected-voices" class="selected-voices" aria-live="polite">
-                  <span class="empty-selection">Choose a lead culture</span>
-                </div>
-                <button id="lesson-chip" class="lesson-chip" type="button" hidden></button>
-              </div>
-              <div id="voice-roster" class="voice-roster" aria-label="Cultures and possible coalition"></div>
-            </section>
-
-            <section class="command-lane command-action-lane" aria-labelledby="command-action-label">
-              <div class="command-lane-heading"><b>4</b><span id="command-action-label">Do</span></div>
-              <div id="command-verbs" class="command-verbs" role="group" aria-label="Immediate civic verb"></div>
-              <div class="method-row">
-                <label for="command-method">through</label>
-                <select id="command-method" aria-label="Civic method">
-                  <option value="prototype">a prototype</option>
-                  <option value="ritual">a ritual</option>
-                  <option value="boundary">a boundary</option>
-                  <option value="reciprocity">reciprocity</option>
-                  <option value="witness">witness</option>
-                  <option value="remembrance">remembrance</option>
-                  <option value="play">play</option>
-                </select>
-                <span class="intensity-label">force</span>
-                <div id="command-intensity" class="command-intensity" role="group" aria-label="Action intensity">
-                  <button type="button" data-intensity="1" aria-pressed="false">1</button>
-                  <button type="button" data-intensity="2" aria-pressed="true">2</button>
-                  <button type="button" data-intensity="3" aria-pressed="false">3</button>
-                </div>
-              </div>
-              <label class="action-name" for="action-name"><span>Name it</span><input id="action-name" maxlength="56" autocomplete="off" placeholder="optional…" /></label>
-            </section>
-
-            <aside id="command-preview" class="command-preview" aria-label="Action forecast" aria-live="polite">
-              <div class="preview-heading"><span>Before you commit</span><b id="preview-target">Current pressure</b></div>
-              <strong id="preview-title">Choose a culture to lead</strong>
-              <dl>
-                <div><dt>Creates</dt><dd id="preview-creates">a living civic artifact</dd></div>
-                <div><dt>Changes</dt><dd id="preview-changes">the world will show the effect here</dd></div>
-                <div><dt>Cost / risk</dt><dd id="preview-risk">nothing is free</dd></div>
-              </dl>
-              <button id="weave-button" class="weave-button command-execute" type="button" disabled>
-                <span>Choose a lead culture</span>
-                <small>Enter</small>
-              </button>
-            </aside>
-
-            <div id="proposal-list" class="proposal-list" aria-label="Council proposals" hidden></div>
-            <p id="command-feedback" class="command-feedback" role="status" aria-live="assertive"></p>
+          <div id="nano-choice-stage" class="nano-choice-stage">
+            <div id="nano-options" class="nano-options" aria-live="polite">
+              <article class="nano-option is-loading"><i></i><strong>Nano is reading the land…</strong><p>Ecology, culture, invention, and dissent are entering the room.</p></article>
+              <article class="nano-option is-loading"><i></i><strong>A second future is forming…</strong><p>No choice will be a reskin of the first.</p></article>
+              <article class="nano-option is-loading"><i></i><strong>A stranger path is forming…</strong><p>The gamemasters are looking for what this world has never tried.</p></article>
+            </div>
+            <button id="author-toggle" class="author-toggle" type="button" aria-expanded="false" aria-controls="author-panel"><span>Author another way</span><small>Build your own civic action</small></button>
           </div>
+
+          <div id="author-panel" class="author-panel" hidden>
+            <header class="author-header">
+              <button id="author-close" type="button" aria-label="Return to Nano choices">← choices</button>
+              <div id="chosen-option" class="chosen-option" hidden><span>Nano proposal</span><strong id="chosen-option-title"></strong><p id="chosen-option-copy"></p></div>
+              <nav id="author-steps" class="author-steps" aria-label="Authoring steps">
+                <button type="button" data-author-step="0" aria-current="step"><b>1</b><span>Make</span></button><button type="button" data-author-step="1"><b>2</b><span>Place</span></button><button type="button" data-author-step="2"><b>3</b><span>People</span></button><button type="button" data-author-step="3"><b>4</b><span>Method</span></button><button type="button" data-author-step="4"><b>5</b><span>Commit</span></button>
+              </nav>
+            </header>
+
+            <div class="author-pages">
+              <section class="author-page command-domain-lane" data-author-page="0" aria-labelledby="command-domain-label">
+                <div class="author-page-copy"><span id="command-domain-label">What becomes real?</span><p>Choose the kind of civilization you want to grow.</p></div>
+                <div id="command-domain" class="command-domain" role="group" aria-label="Kind of civic change">
+                  <button type="button" data-domain="law" aria-pressed="true"><i>§</i><span>Living law</span><small>Rights that remain amendable</small></button><button type="button" data-domain="culture" aria-pressed="false"><i>◎</i><span>Culture</span><small>A practice people can change</small></button><button type="button" data-domain="invention" aria-pressed="false"><i>✦</i><span>Invention</span><small>A tool with a civic purpose</small></button><button type="button" data-domain="habitat" aria-pressed="false"><i>⌂</i><span>Habitat</span><small>A place people can inhabit</small></button>
+                </div>
+              </section>
+
+              <section class="author-page command-target-lane" data-author-page="1" hidden aria-labelledby="command-target-label">
+                <div class="author-page-copy"><span id="command-target-label">Where does it land?</span><p>Choose here, or touch a settlement, arrival, region, or pressure on the living map.</p></div>
+                <div id="command-targets" class="command-targets" role="listbox" aria-label="Action target"></div>
+              </section>
+
+              <section class="author-page council-choosing" data-author-page="2" hidden aria-labelledby="coalition-label">
+                <div class="author-page-copy"><span id="coalition-label">Who leads?</span><p>One culture leads. A second adds friction, consent, and cost.</p></div>
+                <div class="selection-copy"><div id="selected-voices" class="selected-voices" aria-live="polite"><span class="empty-selection">Choose a lead culture</span></div><button id="lesson-chip" class="lesson-chip" type="button" hidden></button></div>
+                <div id="voice-roster" class="voice-roster" aria-label="Cultures and possible coalition"></div>
+              </section>
+
+              <section class="author-page command-action-lane" data-author-page="3" hidden aria-labelledby="command-action-label">
+                <div class="author-page-copy"><span id="command-action-label">How will they act?</span><p>The verb changes what the world does. The method changes how people experience it.</p></div>
+                <div id="command-verbs" class="command-verbs" role="group" aria-label="Immediate civic verb"></div>
+                <div class="method-row"><label for="command-method">Method</label><select id="command-method" aria-label="Civic method"><option value="prototype">Prototype it</option><option value="ritual">Make it a ritual</option><option value="boundary">Draw a boundary</option><option value="reciprocity">Practice reciprocity</option><option value="witness">Witness it publicly</option><option value="remembrance">Carry memory into it</option><option value="play">Discover it through play</option></select><span class="intensity-label">Reach</span><div id="command-intensity" class="command-intensity" role="group" aria-label="Action reach"><button type="button" data-intensity="1" aria-pressed="false">Local</button><button type="button" data-intensity="2" aria-pressed="true">Shared</button><button type="button" data-intensity="3" aria-pressed="false">Civilization</button></div></div>
+                <label class="action-name" for="action-name"><span>Name it, if you want</span><input id="action-name" maxlength="56" autocomplete="off" placeholder="Nano can name it after the act…" /></label>
+              </section>
+
+              <aside id="command-preview" class="author-page command-preview" data-author-page="4" hidden aria-label="Action forecast" aria-live="polite">
+                <div class="preview-heading"><span>Before you commit</span><b id="preview-target">Choose a place</b></div><strong id="preview-title">Choose who will make this real.</strong>
+                <dl><div><dt>Creates</dt><dd id="preview-creates">a living civic artifact</dd></div><div><dt>World change</dt><dd id="preview-changes">the visible effect will appear here</dd></div><div><dt>Cost & risk</dt><dd id="preview-risk">nothing is free</dd></div></dl>
+                <button id="weave-button" class="weave-button command-execute" type="button" disabled><span>Choose a lead culture</span><small>Enter</small></button>
+              </aside>
+            </div>
+
+            <footer id="author-navigation" class="author-navigation"><button id="author-prev" type="button" disabled>Back</button><span id="author-step-help">Choose what you want to create.</span><button id="author-next" type="button">Next: place it</button></footer>
+            <div id="proposal-list" class="proposal-list" aria-label="Council proposals" hidden></div>
+          </div>
+          <p id="command-feedback" class="command-feedback" role="status" aria-live="assertive"></p>
         </section>
 
         <nav class="edge-rail" aria-label="Nolybab records and systems">
-          <button id="memory-button" class="rail-button" type="button" aria-label="Memory" aria-expanded="false" aria-controls="memory-drawer">
-            <span>Memory</span><b id="memory-count">0</b>
-          </button>
-          <button id="directors-button" class="rail-button" type="button" aria-label="Gamemasters" aria-expanded="false" aria-controls="directors-drawer">
-            <span>Gamemasters</span><b id="active-director-count">8</b>
-          </button>
-          <button id="codex-button" class="rail-button" type="button" aria-label="How it works" aria-expanded="false" aria-controls="codex-drawer">
-            <span>How it works</span><b>?</b>
-          </button>
+          <button id="memory-button" class="rail-button" type="button" aria-expanded="false" aria-controls="memory-drawer"><span>Memory</span><b id="memory-count">0</b></button>
+          <button id="directors-button" class="rail-button" type="button" aria-expanded="false" aria-controls="directors-drawer"><span>Gamemasters</span><b id="active-director-count">8</b></button>
+          <button id="codex-button" class="rail-button" type="button" aria-expanded="false" aria-controls="codex-drawer"><span>How it works</span><b>?</b></button>
         </nav>
 
         <aside id="memory-drawer" class="side-drawer" aria-hidden="true" inert>
-          <div class="drawer-heading">
-            <div><span class="eyebrow">Nothing is erased</span><h2>Memory thread</h2></div>
-            <button class="drawer-close" data-close="memory-drawer" aria-label="Close memory">×</button>
-          </div>
-          <p class="drawer-intro">Mistakes become playable terrain. Choose an unresolved scar to bring its lesson into the current question.</p>
-          <div id="lesson-list" class="lesson-list"></div>
-          <div id="history-list" class="history-list"></div>
+          <div class="drawer-heading"><div><span class="eyebrow">Nothing is erased</span><h2>Memory thread</h2></div><button class="drawer-close" data-close="memory-drawer" aria-label="Close memory">×</button></div>
+          <p class="drawer-intro">Failures become terrain. Carry one forward when the present needs its lesson.</p><div id="lesson-list" class="lesson-list"></div><div id="history-list" class="history-list"></div>
         </aside>
 
         <aside id="directors-drawer" class="side-drawer" aria-hidden="true" inert>
-          <div class="drawer-heading">
-            <div><span class="eyebrow">Always at the knobs</span><h2>Internal gamemasters</h2></div>
-            <button class="drawer-close" data-close="directors-drawer" aria-label="Close gamemasters">×</button>
-          </div>
-          <p class="drawer-intro">Eight adaptive minds read the same civilization differently. The Illustrator, Architect, and Storyweaver can be amplified by GPT-5.4 Nano; the living rules remain sovereign.</p>
-          <div id="ai-disclosure" class="ai-disclosure" data-status="quiet">
-            <i></i><div><strong>GPT-5.4 Nano atelier</strong><span id="ai-disclosure-copy">Procedural fallback is awake. Nano joins when a server key is present.</span></div>
-          </div>
-          <div id="director-list" class="director-list"></div>
-          <div id="knob-list" class="knob-list"></div>
+          <div class="drawer-heading"><div><span class="eyebrow">Always at the knobs</span><h2>AI gamemasters</h2></div><button class="drawer-close" data-close="directors-drawer" aria-label="Close gamemasters">×</button></div>
+          <p class="drawer-intro">GPT-5.4 Nano repeatedly invents names, people, dilemmas, civic choices, consequences, and visual direction. Simulation rules validate every effect.</p>
+          <div id="ai-disclosure" class="ai-disclosure" data-status="quiet"><i></i><div><strong>GPT-5.4 Nano</strong><span id="ai-disclosure-copy">The local simulation is alive while Nano connects.</span></div></div><div id="director-list" class="director-list"></div><div id="knob-list" class="knob-list"></div>
         </aside>
 
         <aside id="codex-drawer" class="side-drawer codex-drawer" aria-hidden="true" inert>
-          <div class="drawer-heading">
-            <div><span class="eyebrow">The reverse tower</span><h2>How the world moves</h2></div>
-            <button class="drawer-close" data-close="codex-drawer" aria-label="Close guide">×</button>
-          </div>
-          <div class="guide-tabs" role="tablist" aria-label="Guide sections">
-            <button id="guide-play-tab" class="is-active" role="tab" aria-selected="true" aria-controls="guide-play" type="button">Play</button>
-            <button id="guide-world-tab" role="tab" aria-selected="false" aria-controls="guide-world" type="button">World logic</button>
-            <button id="guide-premise-tab" role="tab" aria-selected="false" aria-controls="guide-premise" type="button">Premise</button>
-          </div>
-
-          <section id="guide-play" class="guide-panel" role="tabpanel" aria-labelledby="guide-play-tab">
-            <p class="codex-lead">You author concrete civic moves. Every target, culture, verb, method, and intensity changes the cost and forecast before you commit.</p>
-            <ol class="play-sequence">
-              <li><b>Choose what</b><span>Make a law, shape a culture, invent something, or build a new way of living.</span></li>
-              <li><b>Choose where</b><span>Touch a pressure, arrival, settlement, region, living artifact, or the Commons in the world or Target lane.</span></li>
-              <li><b>Choose who</b><span>Name a lead culture and, if you want friction or wider consent, add an ally.</span></li>
-              <li><b>Choose how</b><span>Act with an immediate verb through witness, prototype, ritual, boundary, reciprocity, remembrance, or play. Set the force and name the result.</span></li>
-              <li><b>Commit</b><span>Read the explicit resource cost, risk, likely pressure shift, and artifact forecast. Act now, interrupt autonomy, or reroute the pressure elsewhere.</span></li>
-            </ol>
-            <div class="control-legend"><span><kbd>1–7</kbd> choose cultures</span><span><kbd>Enter</kbd> commit</span><span><kbd>M</kbd> memory</span><span><kbd>G</kbd> gamemasters</span><span><kbd>?</kbd> guide</span></div>
-          </section>
-
-          <section id="guide-world" class="guide-panel" role="tabpanel" aria-labelledby="guide-world-tab" hidden>
-            <p class="codex-lead">This is a civilization organism, not a city builder. Your actions create living laws, cultural practices, inventions, settlements, sites, migrations, and new pressures that continue changing after you touch them.</p>
-            <dl class="premise-list">
-              <div><dt>Colored constellations</dt><dd>The seven cultures. Brightness is presence; their threads are relationships.</dd></div>
-              <div><dt>The breathing center</dt><dd>The Commons. Laws, cultures, inventions, habitats, arrivals, and pressures move through it rather than waiting in an event queue.</dd></div>
-              <div><dt>Mistake Mountain</dt><dd>Failures remain as playable terrain instead of becoming reloads.</dd></div>
-              <div><dt>Nano atelier</dt><dd>GPT-5.4 Nano can improvise council language and procedural visual direction. Validated simulation rules alone apply consequences.</dd></div>
-              <div><dt>Deep memory</dt><dd>Neon preserves civic actions and artifacts in an append-only world ledger while the active organism stays light enough to breathe forever.</dd></div>
-            </dl>
-          </section>
-
-          <section id="guide-premise" class="guide-panel" role="tabpanel" aria-labelledby="guide-premise-tab" hidden>
-            <p class="codex-lead">Civilization as we knew it optimized itself to death. Nolybab begins again—not by finding one perfect answer, but by learning how unlike truths can remain unlike and still act together.</p>
-            <p class="codex-note">There is no final victory and no reload-worthy failure. A balanced Dawn changes the rules. A collapse composts into the next epoch. The organism keeps its memory either way.</p>
-            <button id="new-seed-button" class="danger-link" type="button">Begin with a different surviving truth</button>
-          </section>
+          <div class="drawer-heading"><div><span class="eyebrow">One minute to play</span><h2>How Nolybab works</h2></div><button class="drawer-close" data-close="codex-drawer" aria-label="Close guide">×</button></div>
+          <div class="guide-tabs" role="tablist"><button id="guide-play-tab" class="is-active" role="tab" aria-selected="true" aria-controls="guide-play" type="button">Play</button><button id="guide-world-tab" role="tab" aria-selected="false" aria-controls="guide-world" type="button">World</button><button id="guide-premise-tab" role="tab" aria-selected="false" aria-controls="guide-premise" type="button">Premise</button></div>
+          <section id="guide-play" class="guide-panel" role="tabpanel" aria-labelledby="guide-play-tab"><p class="codex-lead">Read what is happening. Choose one of Nano's three concrete futures, or author another way. Preview cost and risk, commit, then watch people build the consequence.</p><ol class="play-sequence"><li><b>See the people</b><span>Arrivals have names, headcounts, needs, skills, and a destination.</span></li><li><b>Choose a future</b><span>Nano generates three different civic actions from the current world—not a repeating event script.</span></li><li><b>Make it yours</b><span>Open Author another way to choose what, where, who, and how one step at a time.</span></li><li><b>Watch it become physical</b><span>Settlements, laws, cultures, inventions, routes, scars, and population persist and keep changing.</span></li></ol><div class="control-legend"><span><kbd>Enter</kbd> commit</span><span><kbd>M</kbd> memory</span><span><kbd>G</kbd> gamemasters</span><span><kbd>?</kbd> guide</span></div></section>
+          <section id="guide-world" class="guide-panel" role="tabpanel" aria-labelledby="guide-world-tab" hidden><p class="codex-lead">This is a civilization simulation, not a city builder. Growth means new rights, practices, tools, habitats, relationships, migrations, and ecological bargains—not placing generic buildings on a grid.</p><dl class="premise-list"><div><dt>Humans are authors</dt><dd>Settlers arrive with needs and gifts, then change the culture that receives them.</dd></div><div><dt>Nano is early and often</dt><dd>It imagines arrivals, choices, consequences, names, visual motifs, and dissent. Structured validation keeps the simulation coherent.</dd></div><div><dt>The map is the record</dt><dd>Every settlement, law, practice, invention, route, pressure, and scar becomes visible terrain.</dd></div><div><dt>Neon remembers</dt><dd>Novel actions and artifacts are preserved in an append-only civic ledger.</dd></div></dl></section>
+          <section id="guide-premise" class="guide-panel" role="tabpanel" aria-labelledby="guide-premise-tab" hidden><p class="codex-lead">The old civilization optimized itself to death. People reach Nolybab to begin again with sustainable materials, plural power, useful dissent, and technologies that answer to living systems.</p><p class="codex-note">There is no final build order. The world keeps moving, the gamemasters keep inventing, and every choice changes what choices become possible.</p><button id="new-seed-button" class="danger-link" type="button">Begin with a different surviving truth</button></section>
         </aside>
 
-        <div id="result-toast" class="result-toast" role="status" aria-live="assertive" aria-hidden="true">
-          <span id="result-kind" class="eyebrow"></span>
-          <h2 id="result-title"></h2>
-          <p id="result-copy"></p>
-          <p id="result-delta" class="result-delta"></p>
-          <div id="result-word" class="result-word"></div>
-        </div>
-
+        <div id="result-toast" class="result-toast" role="status" aria-live="assertive" aria-hidden="true"><span id="result-kind" class="eyebrow"></span><h2 id="result-title"></h2><p id="result-copy"></p><p id="result-delta" class="result-delta"></p><div id="result-word" class="result-word"></div></div>
         <div id="hover-note" class="hover-note" aria-hidden="true"></div>
       </section>
 
       <section id="arrival" class="arrival" aria-labelledby="arrival-title">
         <div class="arrival-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="arrival-copy">
-          <p class="eyebrow">A civilization after certainty</p>
-          <h2 id="arrival-title">The old world optimized itself to death.</h2>
-          <label for="seed-phrase">What must survive?</label>
-          <div class="seed-entry">
-            <input id="seed-phrase" maxlength="48" autocomplete="off" placeholder="a promise, a practice, a stubborn truth…" />
-            <button id="begin-button" type="button">Begin the first breath</button>
-          </div>
-          <button id="continue-button" class="continue-button" type="button" hidden>Return to the living thread</button>
-          <p class="arrival-note">Your words become the seed. Eight gamemasters—including an Illustrator, Architect, and Storyweaver—take it from there.</p>
-        </div>
+        <div class="arrival-copy"><p class="eyebrow">The first three keepers are waiting</p><h2 id="arrival-title">What should survive the old world's end?</h2><p class="arrival-lede">Your answer seeds the land. Then people arrive, Nano imagines unfamiliar futures, and you decide what this civilization actually becomes.</p><label for="seed-phrase">Carry one truth into Nolybab</label><div class="seed-entry"><input id="seed-phrase" maxlength="48" autocomplete="off" placeholder="care without control, soil before profit…" /><button id="begin-button" type="button">Let the people arrive</button></div><button id="continue-button" class="continue-button" type="button" hidden>Return to the living world</button><p class="arrival-note">Powered by GPT-5.4 Nano gamemasters · every civic artifact preserved</p></div>
       </section>
     </main>
     <script type="module" src="/src/main.ts"></script>

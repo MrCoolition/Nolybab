@@ -1,4 +1,4 @@
-import type { NanoStatus } from '../ai/NanoGamemasterClient';
+import type { NanoCivicDirection, NanoCivicOption, NanoStatus } from '../ai/NanoGamemasterClient';
 import { NanoGamemasterClient } from '../ai/NanoGamemasterClient';
 import type { LivingSoundscape } from '../audio/LivingSoundscape';
 import type { NolybabScene } from '../rendering/NolybabScene';
@@ -129,6 +129,11 @@ export class NolybabHud {
   private foreseeTimer = 0;
   private lastForeseeKey = '';
   private nanoForecast: Record<string, unknown> | null = null;
+  private latestNanoDirection: NanoCivicDirection | null = null;
+  private arrivalNanoDirection: NanoCivicDirection | null = null;
+  private selectedNanoOption: NanoCivicOption | null = null;
+  private authorStep: 0 | 1 | 2 | 3 | 4 = 0;
+  private authorMode: 'choices' | 'option' | 'custom' = 'choices';
 
   private readonly arrival = must<HTMLElement>('arrival');
   private readonly seedInput = must<HTMLInputElement>('seed-phrase');
@@ -184,6 +189,34 @@ export class NolybabHud {
   private readonly resultDelta = must<HTMLElement>('result-delta');
   private readonly resultWord = must<HTMLElement>('result-word');
   private readonly hoverNote = must<HTMLElement>('hover-note');
+  private readonly populationStat = must<HTMLElement>('stat-population');
+  private readonly settlementsStat = must<HTMLElement>('stat-settlements');
+  private readonly lawsStat = must<HTMLElement>('stat-laws');
+  private readonly culturesStat = must<HTMLElement>('stat-cultures');
+  private readonly inventionsStat = must<HTMLElement>('stat-inventions');
+  private readonly resourceAttention = must<HTMLElement>('resource-attention');
+  private readonly resourceTrust = must<HTMLElement>('resource-trust');
+  private readonly resourceVitality = must<HTMLElement>('resource-vitality');
+  private readonly resourcePossibility = must<HTMLElement>('resource-possibility');
+  private readonly humanArrivalPanel = must<HTMLElement>('human-arrival-panel');
+  private readonly arrivalPeople = must<HTMLElement>('arrival-people');
+  private readonly arrivalName = must<HTMLElement>('arrival-name');
+  private readonly arrivalDescription = must<HTMLElement>('arrival-description');
+  private readonly arrivalNeeds = must<HTMLElement>('arrival-needs');
+  private readonly arrivalEta = must<HTMLElement>('arrival-eta');
+  private readonly nanoOptions = must<HTMLElement>('nano-options');
+  private readonly nanoChoiceStage = must<HTMLElement>('nano-choice-stage');
+  private readonly authorToggle = must<HTMLButtonElement>('author-toggle');
+  private readonly authorPanel = must<HTMLElement>('author-panel');
+  private readonly authorClose = must<HTMLButtonElement>('author-close');
+  private readonly authorSteps = must<HTMLElement>('author-steps');
+  private readonly authorPrevious = must<HTMLButtonElement>('author-prev');
+  private readonly authorNext = must<HTMLButtonElement>('author-next');
+  private readonly authorStepHelp = must<HTMLElement>('author-step-help');
+  private readonly authorNavigation = must<HTMLElement>('author-navigation');
+  private readonly chosenOption = must<HTMLElement>('chosen-option');
+  private readonly chosenOptionTitle = must<HTMLElement>('chosen-option-title');
+  private readonly chosenOptionCopy = must<HTMLElement>('chosen-option-copy');
 
   constructor(
     simulation: NolybabSimulation,
@@ -246,6 +279,7 @@ export class NolybabHud {
         this.nanoForecast = null;
         this.lastForeseeKey = '';
         this.renderAgency(this.latestSnapshot, true);
+        if (this.authorMode === 'custom' && this.authorStep === 1) this.renderAuthoring();
       }
     };
     this.scene.onHoverCivicTarget = (target, point) => this.showCivicTargetHover(target, point);
@@ -258,11 +292,42 @@ export class NolybabHud {
       if (event.key === 'Enter') void this.beginNewWorld();
     });
     this.weaveButton.addEventListener('click', () => this.executeCommand());
+    this.nanoOptions.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-nano-option]');
+      const localButton = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-local-domain]');
+      if (localButton?.dataset.localDomain) {
+        this.selectedDomain = localButton.dataset.localDomain as CivicDomain;
+        this.openAuthoring();
+        this.setAuthorStep(1);
+        this.renderAgency(this.latestSnapshot, true);
+        return;
+      }
+      const index = Number(button?.dataset.nanoOption);
+      if (!button || !Number.isInteger(index)) return;
+      this.chooseNanoOption(index);
+    });
+    this.authorToggle.addEventListener('click', () => this.openAuthoring());
+    this.authorClose.addEventListener('click', () => this.closeAuthoring());
+    this.authorSteps.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-author-step]');
+      const step = Number(button?.dataset.authorStep);
+      if (!button || step < 0 || step > 4) return;
+      this.setAuthorStep(step as 0 | 1 | 2 | 3 | 4);
+    });
+    this.authorPrevious.addEventListener('click', () => this.setAuthorStep(Math.max(0, this.authorStep - 1) as 0 | 1 | 2 | 3 | 4));
+    this.authorNext.addEventListener('click', () => {
+      if (this.authorStep === 4) {
+        this.executeCommand();
+        return;
+      }
+      this.setAuthorStep(Math.min(4, this.authorStep + 1) as 0 | 1 | 2 | 3 | 4);
+    });
     this.commandDomain.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-domain]');
       const domain = button?.dataset.domain as CivicDomain | undefined;
       if (!domain || !(domain in DOMAIN_META)) return;
       this.selectedDomain = domain;
+      this.selectedNanoOption = null;
       this.nanoForecast = null;
       this.lastForeseeKey = '';
       this.renderAgency(this.latestSnapshot, true);
@@ -280,12 +345,14 @@ export class NolybabHud {
       this.nanoForecast = null;
       this.lastForeseeKey = '';
       this.renderAgency(this.latestSnapshot, true);
+      if (this.authorMode === 'custom' && this.authorStep === 1) this.renderAuthoring();
     });
     this.commandVerbs.addEventListener('click', (event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-verb]');
       const verb = button?.dataset.verb as CivicVerb | undefined;
       if (!verb || !DEFAULT_VERBS.includes(verb) || button?.disabled) return;
       this.selectedVerb = verb;
+      this.selectedNanoOption = null;
       this.nanoForecast = null;
       this.lastForeseeKey = '';
       this.renderAgency(this.latestSnapshot, true);
@@ -431,6 +498,135 @@ export class NolybabHud {
     trigger?.focus({ preventScroll: true });
   }
 
+  private openAuthoring(): void {
+    this.authorMode = 'custom';
+    this.selectedNanoOption = null;
+    this.authorStep = 0;
+    this.authorToggle.setAttribute('aria-expanded', 'true');
+    this.renderAuthoring();
+  }
+
+  private closeAuthoring(): void {
+    this.authorMode = 'choices';
+    this.selectedNanoOption = null;
+    this.authorToggle.setAttribute('aria-expanded', 'false');
+    this.renderAuthoring();
+    this.renderNanoChoices();
+  }
+
+  private setAuthorStep(step: 0 | 1 | 2 | 3 | 4): void {
+    this.authorStep = step;
+    this.renderAuthoring();
+    if (step === 4) this.renderAgency(this.latestSnapshot, true);
+  }
+
+  private chooseNanoOption(index: number): void {
+    const option = this.latestNanoDirection?.options[index];
+    if (!option) return;
+    this.selectedNanoOption = option;
+    this.selectedDomain = option.domain;
+    this.selectedVerb = option.verb;
+    this.selectedMethod = option.method;
+    this.selectedIntensity = 2;
+    this.actionName.value = option.title;
+
+    const leadByDomain: Record<CivicDomain, VoiceId> = {
+      law: 'guardians',
+      culture: 'cultivators',
+      invention: 'innovators',
+      habitat: 'ecostewards',
+    };
+    this.selectedVoices = [leadByDomain[option.domain]];
+    if (option.verb === 'bind') this.selectedVoices.push(option.domain === 'invention' ? 'pioneers' : 'mountaineers');
+
+    const targetPriority: Record<CivicDomain, CivicTargetRef['kind'][]> = {
+      habitat: ['arrival', 'settlement', 'region', 'commons', 'pressure'],
+      culture: ['arrival', 'settlement', 'culture', 'commons', 'pressure'],
+      invention: ['settlement', 'region', 'pressure', 'commons', 'invention'],
+      law: ['pressure', 'settlement', 'region', 'commons', 'law'],
+    };
+    const candidates = this.collectCommandTargets(this.latestSnapshot, false).sort((a, b) => {
+      const rank = targetPriority[option.domain];
+      return rank.indexOf(a.target.kind) - rank.indexOf(b.target.kind);
+    });
+    this.selectedTarget = candidates.find(({ target }) => this.simulation.getActionAffordances(target).some((affordance) =>
+      affordance.verb === option.verb && affordance.available && affordance.domains.includes(option.domain),
+    ))?.target ?? candidates[0]?.target ?? { kind: 'commons', id: 'commons' };
+
+    this.scene.setSelectedVoices(this.selectedVoices);
+    this.scene.setSelectedCivicTarget(this.selectedTarget);
+    this.nanoForecast = this.latestNanoDirection as unknown as Record<string, unknown>;
+    this.authorMode = 'option';
+    this.authorStep = 4;
+    this.renderSelection(this.latestSnapshot);
+    this.renderAgency(this.latestSnapshot, true);
+    this.renderAuthoring();
+  }
+
+  private renderAuthoring(): void {
+    const isOpen = this.authorMode !== 'choices';
+    this.voiceDock.dataset.mode = this.authorMode;
+    this.nanoChoiceStage.hidden = isOpen;
+    this.authorPanel.hidden = !isOpen;
+    this.authorToggle.setAttribute('aria-expanded', String(isOpen));
+    const isOption = this.authorMode === 'option';
+    this.chosenOption.hidden = !isOption;
+    this.authorSteps.hidden = isOption;
+    this.authorNavigation.hidden = isOption;
+    if (isOption && this.selectedNanoOption) {
+      this.chosenOptionTitle.textContent = this.selectedNanoOption.title;
+      this.chosenOptionCopy.textContent = `${this.selectedNanoOption.promise} Risk: ${this.selectedNanoOption.risk}`;
+    }
+    this.authorPanel.querySelectorAll<HTMLElement>('[data-author-page]').forEach((page) => {
+      const pageStep = Number(page.dataset.authorPage);
+      page.hidden = isOption ? pageStep !== 4 : pageStep !== this.authorStep;
+    });
+    this.authorSteps.querySelectorAll<HTMLButtonElement>('[data-author-step]').forEach((button) => {
+      const active = Number(button.dataset.authorStep) === this.authorStep;
+      if (active) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
+    });
+    this.authorPrevious.disabled = this.authorStep === 0;
+    const nextLabels = ['Next: place it', 'Next: choose people', 'Next: choose method', 'Next: review', 'Commit this future'];
+    const help = [
+      'Choose what you want to create.',
+      this.selectedTarget ? 'A place is selected. You can also touch the map.' : 'Choose a place, arrival, settlement, pressure, or region.',
+      this.selectedVoices[0] ? `${VOICE_BY_ID[this.selectedVoices[0]].shortName} will lead.` : 'Choose the culture that will lead.',
+      `${VERB_LABELS[this.selectedVerb]} through ${this.selectedMethod}.`,
+      this.actionPreview?.valid ? 'The world is ready. Read the cost, then commit.' : this.actionPreview?.errors[0] ?? 'Complete the missing parts.',
+    ];
+    this.authorNext.textContent = nextLabels[this.authorStep] ?? 'Next';
+    this.authorNext.disabled = this.authorStep === 4 && !this.actionPreview?.valid;
+    this.authorStepHelp.textContent = help[this.authorStep] ?? '';
+  }
+
+  private renderNanoChoices(): void {
+    if (this.authorMode !== 'choices') return;
+    const direction = this.latestNanoDirection;
+    if (direction?.options?.length === 3) {
+      const palette = direction.visualDirection?.palette ?? ['#efc45a', '#69b8e8', '#91b66b', '#b997d8'];
+      this.nanoOptions.innerHTML = direction.options.map((option, index) => `<button class="nano-option" type="button" data-nano-option="${index}" style="--option-color:${escapeHtml(palette[index % palette.length] ?? '#efc45a')}">
+        <span class="nano-option-top"><i>${escapeHtml(option.domain)}</i><em>${escapeHtml(option.verb)} · ${escapeHtml(option.method)}</em></span>
+        <strong>${escapeHtml(option.title)}</strong>
+        <p>${escapeHtml(option.promise)}</p>
+        <small><b>Tradeoff</b> ${escapeHtml(option.risk)}</small>
+        <span class="option-visual">${escapeHtml(option.visualHook)}</span>
+        <span class="option-choose">Choose this future <b>→</b></span>
+      </button>`).join('');
+      return;
+    }
+    if (this.nanoState === 'fallback') {
+      const pressure = this.activePressure(this.latestSnapshot);
+      const human = this.latestSnapshot.agency.arrivals.find((arrival) => arrival.kind === 'people' && arrival.status === 'approaching');
+      const local = [
+        { domain: 'habitat' as CivicDomain, verb: 'shelter' as CivicVerb, method: 'reciprocity' as CivicMethod, target: human?.name ?? 'the arriving people' },
+        { domain: 'law' as CivicDomain, verb: 'refuse' as CivicVerb, method: 'boundary' as CivicMethod, target: pressure?.title ?? 'the nearest pressure' },
+        { domain: 'invention' as CivicDomain, verb: 'seed' as CivicVerb, method: 'prototype' as CivicMethod, target: this.latestSnapshot.agency.settlements.at(-1)?.name ?? 'the first camp' },
+      ];
+      this.nanoOptions.innerHTML = local.map((item) => `<button class="nano-option is-local" type="button" data-local-domain="${item.domain}"><span class="nano-option-top"><i>${item.domain}</i><em>local safety net</em></span><strong>${VERB_LABELS[item.verb]} ${escapeHtml(item.target)}</strong><p>${escapeHtml(DOMAIN_META[item.domain].creates)}</p><span class="option-visual">Nano will replace this as soon as it reconnects.</span></button>`).join('');
+    }
+  }
+
   private async beginNewWorld(): Promise<void> {
     const phrase = this.seedInput.value.trim();
     if (!phrase) {
@@ -441,12 +637,19 @@ export class NolybabHud {
     }
     this.nano.cancel();
     this.lastNanoQuestionId = null;
+    this.latestNanoDirection = null;
+    this.arrivalNanoDirection = null;
+    this.selectedNanoOption = null;
+    this.authorMode = 'choices';
+    this.authorStep = 0;
     this.selectedTarget = null;
     this.scene.setSelectedCivicTarget(null);
     this.nanoForecast = null;
     this.lastForeseeKey = '';
     this.simulation.reseed(phrase);
     this.releaseLocalSelection();
+    this.renderAuthoring();
+    this.renderNanoChoices();
     await this.enterWorld();
   }
 
@@ -457,6 +660,7 @@ export class NolybabHud {
     window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
       detail: { kind: 'arrival', snapshot: this.simulation.snapshot },
     }));
+    this.renderNanoChoices();
     const enabled = await this.soundscape.setEnabled(true);
     this.renderSoundButton(enabled);
     window.setTimeout(() => this.arrival.setAttribute('aria-hidden', 'true'), 900);
@@ -556,10 +760,16 @@ export class NolybabHud {
       this.setCommandFeedback('The world is physically changing. Hold it for a breath, then act again.');
       return;
     }
+    this.showCivicConsequence(result);
     this.actionName.value = '';
     this.nanoForecast = null;
     this.lastForeseeKey = '';
     this.setCommandFeedback(result.summary, 'success');
+    this.authorMode = 'choices';
+    this.selectedNanoOption = null;
+    this.latestNanoDirection = null;
+    this.renderAuthoring();
+    this.renderNanoChoices();
     window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
       detail: { kind: 'consequence', snapshot: this.simulation.snapshot, input, result },
     }));
@@ -620,6 +830,12 @@ export class NolybabHud {
     this.reshapeButton.setAttribute('aria-pressed', 'false');
     this.selectedTarget = destination;
     this.setCommandFeedback(result.summary, 'success');
+    this.showCivicConsequence(result);
+    this.authorMode = 'choices';
+    this.selectedNanoOption = null;
+    this.latestNanoDirection = null;
+    this.renderAuthoring();
+    this.renderNanoChoices();
     window.dispatchEvent(new CustomEvent('nolybab:nano-request', {
       detail: { kind: 'consequence', snapshot: this.simulation.snapshot, input: result.input, result },
     }));
@@ -649,6 +865,12 @@ export class NolybabHud {
       result?: CivicActionResult;
     } | undefined;
     if (!detail?.direction || typeof detail.direction !== 'object') return;
+    const direction = detail.direction as unknown as NanoCivicDirection;
+    if (detail.kind === 'arrival') this.arrivalNanoDirection = direction;
+    if (Array.isArray(direction.options) && direction.options.length === 3) {
+      this.latestNanoDirection = direction;
+      if (this.authorMode === 'choices') this.renderNanoChoices();
+    }
     if (detail.kind === 'foresee') {
       const current = this.buildActionInput();
       if (!current || !detail.input || targetKey(current.target) !== targetKey(detail.input.target) || current.domain !== detail.input.domain || current.lead !== detail.input.lead) return;
@@ -660,8 +882,14 @@ export class NolybabHud {
     if (detail.kind === 'arrival' && worldLine) {
       this.questionPrompt.textContent = worldLine;
       this.setCommandFeedback(worldLine);
+      this.renderHumanArrival(this.simulation.snapshot);
     } else if (detail.kind === 'consequence' && worldLine) {
       this.setCommandFeedback(worldLine, 'success');
+      this.resultCopy.textContent = direction.consequence || worldLine;
+      this.resultDelta.textContent = direction.dissent ? `Dissent remains: ${direction.dissent}` : this.resultDelta.textContent;
+      this.resultWord.innerHTML = `<strong>${escapeHtml(direction.publicName || direction.title)}</strong><span>${escapeHtml(direction.worldLine)}</span>`;
+      this.resultToast.classList.add('is-visible');
+      this.resultToast.setAttribute('aria-hidden', 'false');
     }
   }
 
@@ -687,6 +915,8 @@ export class NolybabHud {
   }
 
   private render(snapshot: SimulationSnapshot): void {
+    this.renderCivilizationStatus(snapshot);
+    this.renderHumanArrival(snapshot);
     this.renderQuestion(snapshot);
     this.renderPhase(snapshot);
     this.renderQualities(snapshot);
@@ -695,6 +925,48 @@ export class NolybabHud {
     this.renderControls(snapshot);
     this.renderMemory(snapshot);
     this.renderDirectors(snapshot);
+    this.renderAuthoring();
+  }
+
+  private renderCivilizationStatus(snapshot: SimulationSnapshot): void {
+    const agency = snapshot.agency;
+    const population = agency.civilization?.population
+      ?? agency.settlements.reduce((sum, settlement) => sum + settlement.inhabitants, 0);
+    this.populationStat.textContent = population.toLocaleString();
+    this.settlementsStat.textContent = String(agency.settlements.length);
+    this.lawsStat.textContent = String(agency.charterLaws.length);
+    this.culturesStat.textContent = String(agency.cultures.length);
+    this.inventionsStat.textContent = String(agency.inventions.length);
+    this.resourceAttention.textContent = String(Math.floor(agency.resources.attention));
+    this.resourceTrust.textContent = String(Math.floor(agency.resources.trust));
+    this.resourceVitality.textContent = String(Math.floor(agency.resources.vitality));
+    this.resourcePossibility.textContent = String(Math.floor(agency.resources.possibility));
+  }
+
+  private renderHumanArrival(snapshot: SimulationSnapshot): void {
+    const humans = snapshot.agency.arrivals.filter((arrival) => arrival.kind === 'people');
+    const arrival = humans.find((candidate) => candidate.status === 'approaching')
+      ?? humans.slice().reverse().find((candidate) => candidate.status === 'settled' || candidate.status === 'welcomed')
+      ?? humans.at(-1);
+    if (!arrival) {
+      this.humanArrivalPanel.hidden = true;
+      return;
+    }
+    this.humanArrivalPanel.hidden = false;
+    const thread = arrival.status === 'approaching' ? this.arrivalNanoDirection?.humanThread : undefined;
+    this.arrivalPeople.textContent = String(arrival.partySize);
+    this.arrivalName.textContent = thread?.communityName || arrival.name;
+    this.arrivalDescription.textContent = thread?.originMemory || arrival.description;
+    const needs = thread?.needs?.length ? thread.needs : arrival.needs.map((need) => QUALITY_META[need]?.label ?? need);
+    const skills = thread?.skills?.slice(0, 2) ?? [];
+    this.arrivalNeeds.innerHTML = [
+      ...needs.map((need) => `<span class="is-need">needs ${escapeHtml(need)}</span>`),
+      ...skills.map((skill) => `<span class="is-skill">brings ${escapeHtml(skill)}</span>`),
+    ].join('');
+    this.arrivalEta.textContent = arrival.status === 'approaching'
+      ? `${Math.max(0, Math.ceil(arrival.timeToArrival))}s`
+      : arrival.status;
+    this.humanArrivalPanel.dataset.status = arrival.status;
   }
 
   private renderQuestion(snapshot: SimulationSnapshot): void {
@@ -747,10 +1019,12 @@ export class NolybabHud {
     });
 
     const lead = this.selectedVoices[0] ? VOICE_BY_ID[this.selectedVoices[0]] : null;
-    if (this.reshapeArmed) this.stageInstruction.textContent = 'Reshape armed: choose the region, settlement, or site that should receive the pressure.';
-    else if (!lead) this.stageInstruction.textContent = 'Choose a lead culture. Add a second only if you want a coalition.';
+    if (this.reshapeArmed) this.stageInstruction.textContent = 'Choose a destination on the map. This pressure will physically move there.';
+    else if (this.authorMode === 'choices') this.stageInstruction.textContent = this.latestNanoDirection?.title ?? 'Three genuinely different futures are being composed from the live world.';
+    else if (this.authorMode === 'option') this.stageInstruction.textContent = 'Review the cost and consequence. You make the final call.';
+    else if (!lead) this.stageInstruction.textContent = 'Choose the culture that will lead this action.';
     else if (!this.selectedTarget) this.stageInstruction.textContent = `${lead.shortName} are ready. Choose where their action lands.`;
-    else this.stageInstruction.textContent = `${DOMAIN_META[this.selectedDomain].label}: ${VERB_LABELS[this.selectedVerb].toLowerCase()} through ${this.selectedMethod}. Change any part or commit now.`;
+    else this.stageInstruction.textContent = `${DOMAIN_META[this.selectedDomain].label}: ${VERB_LABELS[this.selectedVerb].toLowerCase()} through ${this.selectedMethod}.`;
   }
 
   private renderQualities(snapshot: SimulationSnapshot): void {
@@ -830,6 +1104,7 @@ export class NolybabHud {
     this.actionPreview = input ? this.simulation.previewCivicAction(input) : null;
     this.renderActionPreview(this.actionPreview, input);
     this.renderPhase(snapshot);
+    this.renderAuthoring();
     if (input) this.requestNanoForecast(snapshot, input);
 
     const pressure = this.activePressure(snapshot);
@@ -930,13 +1205,18 @@ export class NolybabHud {
         ? direction.costNarrative
         : '';
     const deterministicCost = formatResourceCost(preview.cost);
+    const physicalCost = Object.entries(preview.materialCost)
+      .filter(([, value]) => Math.abs(value ?? 0) > 0.01)
+      .map(([material, value]) => `${Math.abs(value ?? 0).toFixed(1)} ${material}${(value ?? 0) < 0 ? ' recovered' : ''}`)
+      .join(', ');
+    const workCost = `${preview.laborCost} ${preview.laborCost === 1 ? 'person' : 'people'} · ${preview.duration}s${physicalCost ? ` · ${physicalCost}` : ''}`;
     const chance = `${Math.round(preview.chance * 100)}% ${preview.predicted}`;
 
     this.previewTarget.textContent = preview.targetLabel;
     this.previewTitle.textContent = nanoTitle || preview.summary;
     this.previewCreates.textContent = nanoPromise || DOMAIN_META[this.selectedDomain].creates;
     this.previewChanges.textContent = preview.consequences.slice(0, 2).join(' · ') || `${Math.round(Math.abs(preview.pressureDelta) * 100)}% pressure shift`;
-    this.previewRisk.textContent = `${deterministicCost} · ${chance}${nanoRisk ? ` · ${nanoRisk}` : ''}`;
+    this.previewRisk.textContent = `${deterministicCost} · ${workCost} · ${chance}${nanoRisk ? ` · ${nanoRisk}` : ''}`;
     this.previewTitle.closest<HTMLElement>('.command-preview')!.dataset.predicted = preview.predicted;
     this.weaveButton.disabled = !preview.valid;
     if (label) label.textContent = preview.valid
@@ -1041,6 +1321,7 @@ export class NolybabHud {
     this.nanoStatus.innerHTML = `<i></i> ${copy[this.nanoState].short}`;
     this.aiDisclosure.dataset.status = this.nanoState;
     this.aiDisclosureCopy.textContent = copy[this.nanoState].long;
+    if (this.authorMode === 'choices') this.renderNanoChoices();
   }
 
   private renderMemory(snapshot: SimulationSnapshot, force = false): void {
@@ -1089,6 +1370,25 @@ export class NolybabHud {
       ['convergence', snapshot.knobs.convergence],
     ] as const;
     this.knobList.innerHTML = `<h3>Shared control surface</h3>${knobs.map(([label, value]) => `<div class="knob-row"><span>${label}</span><em><i style="--knob:${value}"></i></em><b>${percent(value)}</b></div>`).join('')}`;
+  }
+
+  private showCivicConsequence(result: CivicActionResult): void {
+    window.clearTimeout(this.resultTimer);
+    const input = result.input;
+    const title = this.selectedNanoOption?.title || this.actionName.value.trim() || result.summary;
+    this.resultKind.textContent = `${VERB_LABELS[input.verb]} · ${DOMAIN_META[input.domain].label} · ${result.outcome}`;
+    this.resultTitle.textContent = title;
+    this.resultCopy.textContent = result.summary;
+    this.resultDelta.textContent = `${formatResourceCost(result.cost)} · ${result.createdIds.length} visible ${result.createdIds.length === 1 ? 'change' : 'changes'} · ${Math.round(Math.abs(result.pressureDelta) * 100)}% pressure shift`;
+    this.resultWord.innerHTML = result.sideEffects.length
+      ? `<strong>The world answers</strong><span>${escapeHtml(result.sideEffects.slice(0, 2).join(' · '))}</span>`
+      : '<strong>Construction has begun</strong><span>Watch the map: people and materials are moving now.</span>';
+    this.resultToast.classList.add('is-visible');
+    this.resultToast.setAttribute('aria-hidden', 'false');
+    this.resultTimer = window.setTimeout(() => {
+      this.resultToast.classList.remove('is-visible');
+      this.resultToast.setAttribute('aria-hidden', 'true');
+    }, 6200);
   }
 
   private showOutcome(outcome: WeaveOutcome): void {

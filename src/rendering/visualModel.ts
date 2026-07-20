@@ -1,11 +1,14 @@
 import { VOICE_BY_ID } from '../simulation/content';
 import type {
+  CivicSite,
   CivicWork,
-  CivicWorkKind,
-  EpochLaw,
-  SharedWord,
+  CulturalPractice,
+  LivingLaw,
+  ProceduralArtDirection,
+  Settlement,
   SimulationSnapshot,
   VoiceId,
+  WorldRegion,
 } from '../simulation/types';
 
 export interface WorldPoint {
@@ -13,100 +16,128 @@ export interface WorldPoint {
   y: number;
 }
 
+export interface DioramaBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
 export type BiomeKind = 'wetland' | 'canopy' | 'meadow' | 'stone' | 'cultivated' | 'scarland';
 
-export interface TerrainPatch {
-  x: number;
-  y: number;
+export interface TerrainPatch extends WorldPoint {
   rx: number;
   ry: number;
   rotation: number;
-  roughness: number;
   kind: BiomeKind;
+  vitality: number;
   seed: number;
 }
 
+export interface RegionSite extends WorldPoint {
+  id: string;
+  name: string;
+  terrain: WorldRegion['terrain'];
+  radius: number;
+  vitality: number;
+  openness: number;
+  pressure: number;
+  traits: string[];
+  seed: number;
+}
+
+/** A real, inhabited place from snapshot.agency.settlements. */
 export interface SettlementSite extends WorldPoint {
+  id: string;
+  name: string;
+  form: Settlement['form'];
+  inhabitants: number;
+  maturity: number;
+  resilience: number;
+  openness: number;
+  foundedBy: VoiceId[];
+  description: string;
+  traits: string[];
+  palette: string[];
+  radius: number;
+  seed: number;
+}
+
+/** Civic voices are mobile guild crews, never seven abstract settlements. */
+export interface GuildCrewSite extends WorldPoint {
   voiceId: VoiceId;
   name: string;
+  color: string;
   population: number;
-  tier: number;
-  radius: number;
-  culture: number;
-  ecology: number;
-  seed: number;
-}
-
-export interface RouteSite {
-  a: VoiceId;
-  b: VoiceId;
-  start: WorldPoint;
-  control: WorldPoint;
-  end: WorldPoint;
-  strength: number;
-  tension: number;
-  exchanges: number;
+  activity: 'building' | 'tending' | 'mapping' | 'welcoming' | 'repairing' | 'watching' | 'exploring';
   seed: number;
 }
 
 export interface WorkSite extends WorldPoint {
-  work: CivicWork;
-  radius: number;
+  id: string;
+  title: string;
+  kind: CivicWork['kind'];
+  maturity: number;
+  status: CivicWork['status'];
+  participants: VoiceId[];
+  art: ProceduralArtDirection;
   construction: number;
   seed: number;
 }
 
-export interface LawSite extends WorldPoint {
-  law: EpochLaw;
-  index: number;
-  radius: number;
-}
-
-export interface CultureSite extends WorldPoint {
-  word: SharedWord;
-  radius: number;
-  settlement?: VoiceId;
-}
-
-export interface AgencyRegionSite extends WorldPoint {
+export interface ArtifactSite extends WorldPoint {
   id: string;
-  radius: number;
-  terrain: string;
-  vitality: number;
-  openness: number;
+  domain: 'law' | 'culture' | 'invention' | 'site';
+  title: string;
+  kind: string;
+  maturity: number;
+  risk: number;
+  participants: VoiceId[];
+  traits: string[];
+  palette: string[];
+  status: string;
   seed: number;
 }
 
-export interface PressureSite extends WorldPoint {
+export interface RouteSite {
   id: string;
-  radius: number;
-  severity: number;
-  momentum: number;
-  kind: string;
-  focus: string;
-  affectedIds: string[];
+  start: WorldPoint;
+  control: WorldPoint;
+  end: WorldPoint;
+  strength: number;
+  kind: 'footpath' | 'trade' | 'migration' | 'water-channel';
+  a?: VoiceId;
+  b?: VoiceId;
   seed: number;
 }
 
 export interface ArrivalSite {
   id: string;
+  name: string;
+  kind: string;
   origin: WorldPoint;
   destination: WorldPoint;
   progress: number;
   status: string;
+  partySize: number;
+  urgency: number;
   gifts: string[];
   needs: string[];
+  traits: string[];
+  palette: string[];
   seed: number;
 }
 
-export interface AgencyArtifactSite extends WorldPoint {
+export interface PressureSite extends WorldPoint {
   id: string;
-  domain: 'law' | 'culture' | 'invention' | 'habitat' | 'site';
   title: string;
-  maturity: number;
-  risk: number;
-  traits: string[];
-  regionId?: string;
+  radius: number;
+  severity: number;
+  momentum: number;
+  kind: string;
+  focus: string;
   seed: number;
 }
 
@@ -119,46 +150,52 @@ export interface ActionPulseSite {
   seed: number;
 }
 
+export interface TreeSite extends WorldPoint {
+  size: number;
+  kind: 'tree' | 'fruit' | 'reed' | 'sapling';
+  vitality: number;
+  seed: number;
+}
+
+export interface FieldSite extends WorldPoint {
+  width: number;
+  height: number;
+  rotation: number;
+  crop: 'grain' | 'beans' | 'orchard' | 'wetland';
+  maturity: number;
+  seed: number;
+}
+
+export interface BridgeSite extends WorldPoint {
+  angle: number;
+  length: number;
+  maturity: number;
+  seed: number;
+}
+
 export interface VisualWorldLayout {
   width: number;
   height: number;
+  bounds: DioramaBounds;
   center: WorldPoint;
-  mountain: WorldPoint;
   river: WorldPoint[];
   tributaries: WorldPoint[][];
   terrain: TerrainPatch[];
+  regions: RegionSite[];
   settlements: SettlementSite[];
-  settlementByVoice: Map<VoiceId, SettlementSite>;
-  routes: RouteSite[];
+  guilds: GuildCrewSite[];
   works: WorkSite[];
-  laws: LawSite[];
-  culture: CultureSite[];
-  regions: AgencyRegionSite[];
-  pressures: PressureSite[];
+  artifacts: ArtifactSite[];
+  routes: RouteSite[];
   arrivals: ArrivalSite[];
-  artifacts: AgencyArtifactSite[];
+  pressures: PressureSite[];
+  trees: TreeSite[];
+  fields: FieldSite[];
+  bridges: BridgeSite[];
+  commons: WorldPoint;
   lastAction: ActionPulseSite | null;
   totalPopulation: number;
   inventionCount: number;
-  futureMotifs: string[];
-}
-
-interface LooseRecord {
-  [key: string]: unknown;
-}
-
-interface FutureWorldHints {
-  settlements: LooseRecord[];
-  inventions: LooseRecord[];
-  regions: LooseRecord[];
-  pressures: LooseRecord[];
-  arrivals: LooseRecord[];
-  sites: LooseRecord[];
-  laws: LooseRecord[];
-  cultures: LooseRecord[];
-  lastAction: LooseRecord | null;
-  motifs: string[];
-  population?: number;
 }
 
 const VOICE_IDS = Object.keys(VOICE_BY_ID) as VoiceId[];
@@ -177,471 +214,397 @@ export function hashSigned(seed: number, salt: number): number {
   return hashUnit(seed, salt) * 2 - 1;
 }
 
-export function buildVisualWorld(snapshot: SimulationSnapshot, width: number, height: number): VisualWorldLayout {
-  const hints = readFutureHints(snapshot);
-  const marginX = Math.min(118, Math.max(40, width * 0.075));
-  const marginTop = Math.min(116, Math.max(62, height * 0.12));
-  const marginBottom = Math.min(120, Math.max(58, height * 0.14));
-  const usableWidth = Math.max(240, width - marginX * 2);
-  const usableHeight = Math.max(220, height - marginTop - marginBottom);
-  const center = {
-    x: marginX + usableWidth * (0.46 + hashSigned(snapshot.seed, 701) * 0.035),
-    y: marginTop + usableHeight * (0.52 + hashSigned(snapshot.seed, 702) * 0.035),
-  };
-  const mountain = {
-    x: marginX + usableWidth * (0.16 + hashUnit(snapshot.seed, 703) * 0.15),
-    y: marginTop + usableHeight * (0.16 + hashUnit(snapshot.seed, 704) * 0.22),
-  };
-
-  const settlements = buildSettlements(snapshot, hints, marginX, marginTop, usableWidth, usableHeight, center);
-  const settlementByVoice = new Map(settlements.map((site) => [site.voiceId, site]));
-  const routes = snapshot.relationships
-    .filter((relationship) => relationship.strength > 0.045 || relationship.exchanges > 0)
-    .map((relationship, index): RouteSite | null => {
-      const start = settlementByVoice.get(relationship.a);
-      const end = settlementByVoice.get(relationship.b);
-      if (!start || !end) return null;
-      const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      const dx = end.x - start.x;
-      const dy = end.y - start.y;
-      const distance = Math.max(1, Math.hypot(dx, dy));
-      const bend = hashSigned(snapshot.seed + relationship.exchanges * 17, 800 + index) * Math.min(70, distance * 0.2);
-      const towardCommons = 0.1 + relationship.strength * 0.16;
-      return {
-        a: relationship.a,
-        b: relationship.b,
-        start,
-        end,
-        control: {
-          x: midpoint.x + (center.x - midpoint.x) * towardCommons + (-dy / distance) * bend,
-          y: midpoint.y + (center.y - midpoint.y) * towardCommons + (dx / distance) * bend,
-        },
-        strength: relationship.strength,
-        tension: relationship.tension,
-        exchanges: relationship.exchanges,
-        seed: snapshot.seed + index * 97,
-      };
-    })
-    .filter((route): route is RouteSite => route !== null);
-
-  const works = snapshot.works.slice(-80).map((work, index) => {
-    const participants = work.participants.map((id) => settlementByVoice.get(id)).filter((site): site is SettlementSite => Boolean(site));
-    const anchor = participants.length > 0
-      ? participants.reduce((acc, site) => ({ x: acc.x + site.x / participants.length, y: acc.y + site.y / participants.length }), { x: 0, y: 0 })
-      : center;
-    const lane = (index % 5) - 2;
-    const orbit = 30 + (index % 9) * 13 + Math.floor(index / 9) * 8;
-    const angle = hashUnit(work.glyphSeed, 920 + index) * Math.PI * 2 + snapshot.epoch * 0.03;
-    const x = anchor.x * 0.62 + center.x * 0.38 + Math.cos(angle) * orbit + lane * 3;
-    const y = anchor.y * 0.62 + center.y * 0.38 + Math.sin(angle) * orbit * 0.64;
-    const isPending = snapshot.council?.pendingWork?.id === work.id;
-    const isNewest = index === snapshot.works.slice(-80).length - 1;
-    const phaseProgress = snapshot.civicPhase === 'action'
-      ? 0.16 + (1 - Math.min(1, snapshot.actionSeconds / 9)) * 0.6
-      : snapshot.civicPhase === 'growth' ? 0.88 : 1;
-    return {
-      work,
-      x,
-      y,
-      radius: 7 + work.maturity * 9 + Math.min(5, work.echoes * 0.65),
-      construction: isPending || (isNewest && (snapshot.civicPhase === 'action' || snapshot.civicPhase === 'growth')) ? phaseProgress : 1,
-      seed: work.glyphSeed + index * 131,
-    } satisfies WorkSite;
-  });
-
-  const laws = snapshot.laws.slice(-16).map((law, index): LawSite => {
-    const ring = 35 + Math.floor(index / 6) * 23;
-    const angle = hashUnit(snapshot.seed + law.bornInEpoch * 101, 1100 + index) * Math.PI * 2;
-    return {
-      law,
-      index,
-      x: center.x + Math.cos(angle) * ring,
-      y: center.y + Math.sin(angle) * ring * 0.62,
-      radius: 4.5 + Math.min(4, law.bornInEpoch * 0.3),
-    };
-  });
-
-  const culture = snapshot.lexicon.slice(-72).map((word, index): CultureSite => {
-    const participant = settlementByVoice.get(word.participants[index % 2] as VoiceId);
-    const anchor = participant ?? center;
-    const angle = hashUnit(word.glyphSeed, 1200 + index) * Math.PI * 2;
-    const distance = 18 + (index % 7) * 7;
-    return {
-      word,
-      x: anchor.x + Math.cos(angle) * distance,
-      y: anchor.y + Math.sin(angle) * distance * 0.65,
-      radius: 1.8 + word.strength * 2.5,
-      settlement: participant?.voiceId,
-    };
-  });
-
-  const river = buildRiver(snapshot.seed, width, height, center, snapshot.epoch);
-  const tributaries = settlements
-    .filter((site) => site.ecology > 0.45 || site.voiceId === 'ecostewards' || site.voiceId === 'cultivators')
-    .slice(0, 4)
-    .map((site, index) => buildTributary(snapshot.seed + index * 83, site, nearestPoint(river, site)));
-  const terrain = buildTerrain(snapshot, width, height, center, mountain);
-  const regions = hints.regions.map((region, index) => ({
-    id: readString(region.id) ?? `region-${index}`,
-    ...readWorldPosition(region.position, width, height, center),
-    radius: Math.max(26, (readNumber(region.radius) ?? 0.12) * Math.min(width, height)),
-    terrain: readString(region.terrain) ?? 'commons',
-    vitality: clamp01(readNumber(region.vitality) ?? snapshot.qualities.biosphere),
-    openness: clamp01(readNumber(region.openness) ?? snapshot.qualities.plurality),
-    seed: readNumber(region.glyphSeed) ?? snapshot.seed + index * 229,
-  } satisfies AgencyRegionSite));
-  const locationById = buildLocationIndex(center, settlements, regions, hints, width, height);
-  const pressures = hints.pressures.map((pressure, index) => {
-    const position = readWorldPosition(pressure.position, width, height, center);
-    return {
-      id: readString(pressure.id) ?? `pressure-${index}`,
-      ...position,
-      radius: Math.max(22, (readNumber(pressure.radius) ?? 0.1) * Math.min(width, height)),
-      severity: clamp01(readNumber(pressure.severity) ?? 0.5),
-      momentum: clamp01(readNumber(pressure.momentum) ?? 0.5),
-      kind: readString(pressure.kind) ?? 'unknown',
-      focus: readString(pressure.focus) ?? 'coherence',
-      affectedIds: readStrings(pressure.affectedIds),
-      seed: readNumber(pressure.glyphSeed) ?? snapshot.seed + index * 251,
-    } satisfies PressureSite;
-  });
-  const arrivals = hints.arrivals.map((arrival, index) => {
-    const origin = resolveLocation(arrival.origin, locationById, width, height, center);
-    const destination = resolveLocation(arrival.destination, locationById, width, height, center);
-    const timeToArrival = Math.max(0, readNumber(arrival.timeToArrival) ?? 0);
-    const status = readString(arrival.status) ?? 'travelling';
-    const progress = status === 'arrived' ? 1 : clamp01(1 - timeToArrival / Math.max(12, timeToArrival + 24));
-    return {
-      id: readString(arrival.id) ?? `arrival-${index}`,
-      origin,
-      destination,
-      progress,
-      status,
-      gifts: readStrings(arrival.gifts),
-      needs: readStrings(arrival.needs),
-      seed: readNumber(arrival.glyphSeed) ?? snapshot.seed + index * 277,
-    } satisfies ArrivalSite;
-  });
-  const artifacts = [
-    ...buildAgencyArtifacts(hints.inventions, 'invention', width, height, center, snapshot.seed),
-    ...buildAgencyArtifacts(hints.laws, 'law', width, height, center, snapshot.seed + 401),
-    ...buildAgencyArtifacts(hints.cultures, 'culture', width, height, center, snapshot.seed + 809),
-    ...buildAgencyArtifacts(hints.sites, 'site', width, height, center, snapshot.seed + 1201),
-    ...buildAgencyArtifacts(hints.settlements, 'habitat', width, height, center, snapshot.seed + 1601),
-  ];
-  const pulseRecord = asRecord(hints.lastAction?.pulse);
-  const lastAction = pulseRecord ? {
-    verb: readString(pulseRecord.verb) ?? 'changed',
-    origin: resolveLocation(pulseRecord.origin, locationById, width, height, center),
-    destination: resolveLocation(pulseRecord.destination, locationById, width, height, center),
-    color: readString(pulseRecord.color) ?? '#efc45a',
-    magnitude: clamp01(readNumber(pulseRecord.magnitude) ?? 0.6),
-    seed: readNumber(pulseRecord.seed) ?? snapshot.seed + snapshot.cycle * 313,
-  } satisfies ActionPulseSite : null;
-  const derivedPopulation = Math.round(settlements.reduce((sum, site) => sum + site.population, 0));
-
-  return {
-    width,
-    height,
-    center,
-    mountain,
-    river,
-    tributaries,
-    terrain,
-    settlements,
-    settlementByVoice,
-    routes,
-    works,
-    laws,
-    culture,
-    regions,
-    pressures,
-    arrivals,
-    artifacts,
-    lastAction,
-    totalPopulation: hints.population ?? derivedPopulation,
-    inventionCount: hints.inventions.length + snapshot.works.filter((work) => inventionKinds.has(work.kind)).length,
-    futureMotifs: hints.motifs,
-  };
-}
-
-function buildSettlements(
-  snapshot: SimulationSnapshot,
-  hints: FutureWorldHints,
-  marginX: number,
-  marginTop: number,
-  usableWidth: number,
-  usableHeight: number,
-  center: WorldPoint,
-): SettlementSite[] {
-  const hintedByVoice = new Map<VoiceId, LooseRecord>();
-  for (const hint of hints.settlements) {
-    const voice = readVoiceId(hint.voiceId ?? hint.voice ?? hint.faction ?? hint.id);
-    if (voice) hintedByVoice.set(voice, hint);
-  }
-
-  const working = snapshot.voices.map((state, index): SettlementSite => {
-    const definition = VOICE_BY_ID[state.id];
-    const hint = hintedByVoice.get(state.id);
-    const nx = readNormalizedCoordinate(hint?.x ?? asRecord(hint?.position)?.x);
-    const ny = readNormalizedCoordinate(hint?.y ?? asRecord(hint?.position)?.y);
-    const baseX = nx ?? 0.12 + hashUnit(snapshot.seed + definition.glyphSeed, 201 + index) * 0.76;
-    const baseY = ny ?? 0.12 + hashUnit(snapshot.seed + definition.glyphSeed, 301 + index) * 0.72;
-    const epochDriftX = Math.sin(snapshot.epoch * 0.73 + definition.glyphSeed) * usableWidth * 0.012;
-    const epochDriftY = Math.cos(snapshot.epoch * 0.57 + definition.glyphSeed) * usableHeight * 0.012;
-    const participantWorks = snapshot.works.filter((work) => work.participants.includes(state.id));
-    const hintedPopulation = readNumber(hint?.population ?? hint?.people ?? hint?.inhabitants);
-    const population = Math.max(7, hintedPopulation ?? Math.round(18 + state.presence * 46 + state.mutations * 7 + participantWorks.length * 3.5));
-    const tier = Math.max(1, Math.min(6, 1 + Math.floor((participantWorks.length + snapshot.epoch * 2 + state.mutations) / 4)));
-    return {
-      voiceId: state.id,
-      name: readString(hint?.name) ?? definition.shortName,
-      x: marginX + baseX * usableWidth + epochDriftX,
-      y: marginTop + baseY * usableHeight + epochDriftY,
-      population,
-      tier,
-      radius: 24 + tier * 5 + Math.sqrt(population) * 1.7,
-      culture: Math.min(1, 0.22 + state.mutations * 0.09 + participantWorks.length * 0.035 + snapshot.qualities.plurality * 0.32),
-      ecology: Math.min(1, snapshot.qualities.biosphere * 0.55 + definition.affinities.biosphere * 0.45),
-      seed: snapshot.seed + definition.glyphSeed * 149,
-    };
-  });
-
-  // The locations are seeded, but a small deterministic relaxation keeps them
-  // reading as inhabitable districts rather than seven vertices on a diagram.
-  for (let pass = 0; pass < 6; pass += 1) {
-    for (let i = 0; i < working.length; i += 1) {
-      const site = working[i] as SettlementSite;
-      const fromCenterX = site.x - center.x;
-      const fromCenterY = site.y - center.y;
-      const centerDistance = Math.max(1, Math.hypot(fromCenterX, fromCenterY));
-      if (centerDistance < 90) {
-        site.x += (fromCenterX / centerDistance) * (90 - centerDistance) * 0.22;
-        site.y += (fromCenterY / centerDistance) * (90 - centerDistance) * 0.22;
-      }
-      for (let j = i + 1; j < working.length; j += 1) {
-        const other = working[j] as SettlementSite;
-        const dx = other.x - site.x;
-        const dy = other.y - site.y;
-        const distance = Math.max(0.01, Math.hypot(dx, dy));
-        const minimum = (site.radius + other.radius) * 0.78;
-        if (distance >= minimum) continue;
-        const push = (minimum - distance) * 0.24;
-        site.x -= (dx / distance) * push;
-        site.y -= (dy / distance) * push;
-        other.x += (dx / distance) * push;
-        other.y += (dy / distance) * push;
-      }
-    }
-  }
-  return working;
-}
-
-function buildTerrain(snapshot: SimulationSnapshot, width: number, height: number, center: WorldPoint, mountain: WorldPoint): TerrainPatch[] {
-  const patches: TerrainPatch[] = [];
-  const count = 42 + Math.round(snapshot.qualities.biosphere * 18);
-  const wetness = snapshot.qualities.biosphere * (1 - snapshot.knobs.ecologicalPressure * 0.42);
-  const cultivation = Math.min(0.34, (snapshot.works.length + snapshot.archivedWorkCount * 0.2) / 90);
-  for (let index = 0; index < count; index += 1) {
-    const x = hashUnit(snapshot.seed, 1300 + index) * width;
-    const y = hashUnit(snapshot.seed, 1400 + index) * height;
-    const roll = hashUnit(snapshot.seed + snapshot.epoch * 29, 1500 + index);
-    const mountainDistance = Math.hypot(x - mountain.x, y - mountain.y) / Math.max(width, height);
-    const centerDistance = Math.hypot(x - center.x, y - center.y) / Math.max(width, height);
-    let kind: BiomeKind;
-    if (snapshot.knobs.ecologicalPressure > 0.66 && roll < snapshot.knobs.ecologicalPressure * 0.2) kind = 'scarland';
-    else if (mountainDistance < 0.18 && roll < 0.66) kind = 'stone';
-    else if (centerDistance < 0.28 && roll < cultivation + 0.18) kind = 'cultivated';
-    else if (roll < wetness * 0.22) kind = 'wetland';
-    else if (roll < 0.2 + wetness * 0.46) kind = 'canopy';
-    else if (roll < 0.78) kind = 'meadow';
-    else kind = 'stone';
-    patches.push({
-      x,
-      y,
-      rx: 35 + hashUnit(snapshot.seed, 1600 + index) * 115,
-      ry: 24 + hashUnit(snapshot.seed, 1700 + index) * 78,
-      rotation: hashSigned(snapshot.seed, 1800 + index) * 0.6,
-      roughness: 0.4 + hashUnit(snapshot.seed, 1900 + index) * 0.6,
-      kind,
-      seed: snapshot.seed + index * 173,
-    });
-  }
-  return patches;
-}
-
-function buildLocationIndex(
-  center: WorldPoint,
-  settlements: SettlementSite[],
-  regions: AgencyRegionSite[],
-  hints: FutureWorldHints,
-  width: number,
-  height: number,
-): Map<string, WorldPoint> {
-  const locations = new Map<string, WorldPoint>([['commons', center]]);
-  settlements.forEach((site) => {
-    locations.set(site.voiceId, site);
-    locations.set(site.name, site);
-  });
-  regions.forEach((region) => locations.set(region.id, region));
-  for (const collection of [hints.settlements, hints.inventions, hints.sites, hints.laws, hints.cultures]) {
-    for (const item of collection) {
-      const id = readString(item.id);
-      if (id) locations.set(id, readWorldPosition(item.position, width, height, center));
-    }
-  }
-  return locations;
-}
-
-function buildAgencyArtifacts(
-  records: LooseRecord[],
-  domain: AgencyArtifactSite['domain'],
-  width: number,
-  height: number,
-  center: WorldPoint,
-  seed: number,
-): AgencyArtifactSite[] {
-  return records.slice(-64).map((artifact, index) => {
-    const form = readString(artifact.form ?? artifact.kind);
-    const traits = readStrings(artifact.traits);
-    if (form && !traits.includes(form)) traits.unshift(form);
-    const maturity = readNumber(artifact.maturity ?? artifact.adoption ?? artifact.strength ?? artifact.intensity);
-    const resilience = readNumber(artifact.resilience ?? artifact.reliability ?? artifact.permeability);
-    return {
-      id: readString(artifact.id) ?? `${domain}-${index}`,
-      domain,
-      title: readString(artifact.title ?? artifact.name) ?? domain,
-      ...readWorldPosition(artifact.position, width, height, {
-        x: center.x + hashSigned(seed, 2300 + index) * width * 0.22,
-        y: center.y + hashSigned(seed, 2400 + index) * height * 0.2,
-      }),
-      maturity: clamp01(maturity ?? 0.5),
-      risk: clamp01(readNumber(artifact.risk) ?? (resilience === undefined ? 0 : 1 - resilience)),
-      traits,
-      regionId: readString(artifact.regionId),
-      seed: readNumber(artifact.glyphSeed) ?? seed + index * 307,
-    };
-  });
-}
-
-function resolveLocation(
-  value: unknown,
-  locations: Map<string, WorldPoint>,
-  width: number,
-  height: number,
-  fallback: WorldPoint,
-): WorldPoint {
-  if (typeof value === 'string') return locations.get(value) ?? fallback;
-  const record = asRecord(value);
-  if (record) {
-    const id = readString(record.id ?? record.regionId ?? record.settlementId);
-    if (id && locations.has(id)) return locations.get(id) as WorldPoint;
-  }
-  return readWorldPosition(value, width, height, fallback);
-}
-
-function readWorldPosition(value: unknown, width: number, height: number, fallback: WorldPoint): WorldPoint {
-  const record = asRecord(value);
-  const nx = readNormalizedCoordinate(record?.x);
-  const ny = readNormalizedCoordinate(record?.y);
-  return {
-    x: nx === undefined ? fallback.x : nx * width,
-    y: ny === undefined ? fallback.y : ny * height,
-  };
-}
-
-function buildRiver(seed: number, width: number, height: number, center: WorldPoint, epoch: number): WorldPoint[] {
-  const points: WorldPoint[] = [];
-  const yStart = height * (0.3 + hashUnit(seed, 2001) * 0.35);
-  const bias = (center.y - yStart) * 0.26;
-  for (let step = -2; step <= 34; step += 1) {
-    const t = step / 32;
-    const x = t * width;
-    const broad = Math.sin(t * Math.PI * (1.6 + hashUnit(seed, 2002)) + hashUnit(seed, 2003) * Math.PI * 2) * height * 0.09;
-    const fine = Math.sin(t * Math.PI * 7 + seed * 0.001 + epoch * 0.04) * height * 0.016;
-    points.push({ x, y: yStart + broad + fine + bias * Math.sin(t * Math.PI) });
-  }
-  return points;
-}
-
-function buildTributary(seed: number, start: WorldPoint, end: WorldPoint): WorldPoint[] {
-  const points: WorldPoint[] = [];
-  for (let step = 0; step <= 12; step += 1) {
-    const t = step / 12;
-    const bend = Math.sin(t * Math.PI) * hashSigned(seed, 2101) * 34;
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const distance = Math.max(1, Math.hypot(dx, dy));
-    points.push({
-      x: start.x + dx * t + (-dy / distance) * bend,
-      y: start.y + dy * t + (dx / distance) * bend,
-    });
-  }
-  return points;
-}
-
-function nearestPoint(points: WorldPoint[], target: WorldPoint): WorldPoint {
-  return points.reduce((nearest, point) => Math.hypot(point.x - target.x, point.y - target.y) < Math.hypot(nearest.x - target.x, nearest.y - target.y) ? point : nearest, points[0] ?? target);
-}
-
-function readFutureHints(snapshot: SimulationSnapshot): FutureWorldHints {
-  const raw = snapshot as SimulationSnapshot & LooseRecord;
-  const civilization = asRecord(raw.civilization);
-  const agency = asRecord(raw.agency);
-  const settlements = readRecords(agency?.settlements ?? raw.settlements ?? civilization?.settlements ?? raw.habitats ?? civilization?.habitats);
-  const inventions = readRecords(agency?.inventions ?? raw.inventions ?? civilization?.inventions ?? raw.technologies ?? civilization?.technologies);
-  const regions = readRecords(agency?.regions);
-  const pressures = readRecords(agency?.pressures);
-  const arrivals = readRecords(agency?.arrivals);
-  const sites = readRecords(agency?.sites);
-  const laws = readRecords(agency?.charterLaws);
-  const cultures = readRecords(agency?.cultures);
-  const lastAction = asRecord(agency?.lastAction);
-  const culture = asRecord(raw.culture ?? civilization?.culture ?? agency?.worldCondition);
-  const motifs = readStrings(culture?.motifs ?? culture?.symbols ?? raw.culturalMotifs ?? civilization?.culturalMotifs);
-  const population = readNumber(raw.population ?? civilization?.population ?? agency?.population);
-  return { settlements, inventions, regions, pressures, arrivals, sites, laws, cultures, lastAction, motifs, population };
-}
-
-function readRecords(value: unknown): LooseRecord[] {
-  return Array.isArray(value) ? value.map(asRecord).filter((entry): entry is LooseRecord => Boolean(entry)) : [];
-}
-
-function readStrings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string').slice(0, 24) : [];
-}
-
-function asRecord(value: unknown): LooseRecord | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as LooseRecord : null;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 80) : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function readNormalizedCoordinate(value: unknown): number | undefined {
-  const number = readNumber(value);
-  if (number === undefined) return undefined;
-  if (number >= 0 && number <= 1) return number;
-  if (number >= -1 && number <= 1) return (number + 1) / 2;
-  return undefined;
-}
-
-function readVoiceId(value: unknown): VoiceId | null {
-  return typeof value === 'string' && VOICE_IDS.includes(value as VoiceId) ? value as VoiceId : null;
-}
-
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-const inventionKinds = new Set<CivicWorkKind>([
-  'shared-word',
-  'consent-protocol',
-  'ecological-covenant',
-  'translation-braid',
-]);
+function readPalette(art: ProceduralArtDirection | undefined, fallback: string[]): string[] {
+  if (!art?.palette?.length) return fallback;
+  return [...new Set([...art.palette.filter((entry) => /^#[0-9a-f]{6}$/i.test(entry)), ...fallback])].slice(0, 5);
+}
+
+function mapPoint(point: { x: number; y: number } | undefined, bounds: DioramaBounds, fallback: WorldPoint): WorldPoint {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return fallback;
+  return {
+    x: bounds.left + (0.06 + clamp01(point.x) * 0.88) * bounds.width,
+    y: bounds.top + (0.07 + clamp01(point.y) * 0.86) * bounds.height,
+  };
+}
+
+function buildBounds(width: number, height: number): DioramaBounds {
+  const left = Math.max(26, width * 0.025);
+  const right = width - left;
+  // The world remains visible between the narrative masthead and command deck.
+  const top = Math.max(74, Math.min(124, height * 0.145));
+  const bottomInset = Math.max(116, Math.min(156, height * 0.205));
+  const bottom = Math.max(top + 280, height - bottomInset);
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+function buildRiver(seed: number, bounds: DioramaBounds): WorldPoint[] {
+  const points: WorldPoint[] = [];
+  const base = bounds.top + bounds.height * (0.48 + hashSigned(seed, 201) * 0.06);
+  for (let index = -2; index <= 34; index += 1) {
+    const t = index / 32;
+    points.push({
+      x: bounds.left + t * bounds.width,
+      y: base
+        + Math.sin(t * Math.PI * 2.15 + hashUnit(seed, 202) * Math.PI * 2) * bounds.height * 0.105
+        + Math.sin(t * Math.PI * 6.2 + seed * 0.0003) * bounds.height * 0.018,
+    });
+  }
+  return points;
+}
+
+function polylinePoint(points: WorldPoint[], t: number): WorldPoint {
+  if (points.length < 2) return points[0] ?? { x: 0, y: 0 };
+  const scaled = clamp01(t) * (points.length - 1);
+  const index = Math.min(points.length - 2, Math.floor(scaled));
+  const local = scaled - index;
+  const a = points[index]!;
+  const b = points[index + 1]!;
+  return { x: a.x + (b.x - a.x) * local, y: a.y + (b.y - a.y) * local };
+}
+
+function nearestRiverT(river: WorldPoint[], point: WorldPoint): number {
+  let best = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  river.forEach((candidate, index) => {
+    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+    if (distance < bestDistance) {
+      best = index / Math.max(1, river.length - 1);
+      bestDistance = distance;
+    }
+  });
+  return best;
+}
+
+function curveBetween(start: WorldPoint, end: WorldPoint, seed: number, pull = 0.16): WorldPoint {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const distance = Math.max(1, Math.hypot(dx, dy));
+  const bend = hashSigned(seed, 490) * Math.min(62, distance * pull);
+  return {
+    x: (start.x + end.x) * 0.5 - (dy / distance) * bend,
+    y: (start.y + end.y) * 0.5 + (dx / distance) * bend,
+  };
+}
+
+export function buildVisualWorld(snapshot: SimulationSnapshot, width: number, height: number): VisualWorldLayout {
+  const bounds = buildBounds(width, height);
+  const center = { x: bounds.left + bounds.width * 0.51, y: bounds.top + bounds.height * 0.52 };
+  const agency = snapshot.agency;
+
+  const regions = agency.regions.map((region, index): RegionSite => ({
+    id: region.id,
+    name: region.name,
+    terrain: region.terrain,
+    ...mapPoint(region.position, bounds, center),
+    radius: Math.max(48, Math.min(116, region.radius * Math.min(bounds.width, bounds.height) * 1.18)),
+    vitality: clamp01(region.vitality),
+    openness: clamp01(region.openness),
+    pressure: clamp01(region.pressure),
+    traits: [...region.traits],
+    seed: region.glyphSeed || snapshot.seed + index * 109,
+  }));
+  const regionById = new Map(regions.map((region) => [region.id, region]));
+  const commonsRegion = regions.find((region) => region.terrain === 'commons') ?? regions[0];
+  const commons = commonsRegion ? { x: commonsRegion.x, y: commonsRegion.y } : center;
+
+  const settlements = agency.settlements.map((settlement, index): SettlementSite => {
+    const region = regionById.get(settlement.regionId);
+    const position = mapPoint(settlement.position, bounds, region ?? commons);
+    const maturity = clamp01(settlement.maturity);
+    const inhabitants = Math.max(0, Math.floor(settlement.inhabitants));
+    return {
+      id: settlement.id,
+      name: settlement.name,
+      form: settlement.form,
+      inhabitants,
+      maturity,
+      resilience: clamp01(settlement.resilience),
+      openness: clamp01(settlement.openness),
+      foundedBy: [...settlement.foundedBy],
+      description: settlement.description,
+      traits: [...settlement.traits],
+      palette: readPalette(settlement.visualDirection, ['#e9b85c', '#f4e6bd', '#4f8971']),
+      radius: Math.max(44, Math.min(116, 38 + Math.sqrt(Math.max(3, inhabitants)) * 4.4 + maturity * 32)),
+      seed: settlement.glyphSeed || snapshot.seed + index * 137,
+      ...position,
+    };
+  });
+  const primaryHabitat = settlements.slice().sort((a, b) => b.inhabitants - a.inhabitants)[0];
+  const guildActivities: GuildCrewSite['activity'][] = ['building', 'mapping', 'tending', 'watching', 'repairing', 'welcoming', 'exploring'];
+  const guilds = snapshot.voices.map((voice, index): GuildCrewSite => {
+    const definition = VOICE_BY_ID[voice.id];
+    const home = settlements.find((settlement) => settlement.foundedBy.includes(voice.id)) ?? primaryHabitat;
+    const region = regions[(index * 3 + 1) % Math.max(1, regions.length)];
+    const anchor = home ?? region ?? commons;
+    const angle = hashUnit(snapshot.seed + definition.glyphSeed, 610 + index) * Math.PI * 2;
+    const distance = 26 + hashUnit(snapshot.seed, 650 + index) * Math.max(36, Math.min(86, bounds.height * 0.17));
+    return {
+      voiceId: voice.id,
+      name: definition.shortName,
+      color: definition.cssColor,
+      population: Math.max(2, Math.round(2 + voice.presence * 7 + voice.mutations * 1.5)),
+      activity: guildActivities[index % guildActivities.length]!,
+      x: Math.max(bounds.left + 26, Math.min(bounds.right - 26, anchor.x + Math.cos(angle) * distance)),
+      y: Math.max(bounds.top + 24, Math.min(bounds.bottom - 22, anchor.y + Math.sin(angle) * distance * 0.58)),
+      seed: snapshot.seed + definition.glyphSeed * 173,
+    };
+  });
+  const guildByVoice = new Map(guilds.map((guild) => [guild.voiceId, guild]));
+
+  const works = snapshot.works.slice(-28).map((work, index): WorkSite => {
+    const anchors = work.participants.map((id) => guildByVoice.get(id)).filter((value): value is GuildCrewSite => Boolean(value));
+    const anchor = anchors.length
+      ? anchors.reduce((sum, item) => ({ x: sum.x + item.x / anchors.length, y: sum.y + item.y / anchors.length }), { x: 0, y: 0 })
+      : commons;
+    const angle = hashUnit(work.glyphSeed, 720 + index) * Math.PI * 2;
+    const spread = 26 + (index % 5) * 11;
+    const newest = index === Math.min(27, snapshot.works.length - 1);
+    return {
+      id: work.id,
+      title: work.title,
+      kind: work.kind,
+      maturity: clamp01(work.maturity),
+      status: work.status,
+      participants: [...work.participants],
+      art: work.art,
+      construction: newest && (snapshot.civicPhase === 'action' || snapshot.civicPhase === 'growth')
+        ? snapshot.civicPhase === 'growth' ? 0.84 : Math.max(0.18, 1 - snapshot.actionSeconds / 10)
+        : 1,
+      x: Math.max(bounds.left + 22, Math.min(bounds.right - 22, anchor.x + Math.cos(angle) * spread)),
+      y: Math.max(bounds.top + 20, Math.min(bounds.bottom - 20, anchor.y + Math.sin(angle) * spread * 0.58)),
+      seed: work.glyphSeed + index * 181,
+    };
+  });
+
+  const artifacts: ArtifactSite[] = [];
+  const pushArtifact = (
+    record: { id: string; position: { x: number; y: number }; glyphSeed: number; traits?: string[]; visualDirection: ProceduralArtDirection },
+    domain: ArtifactSite['domain'],
+    title: string,
+    kind: string,
+    maturity: number,
+    risk: number,
+    participants: VoiceId[],
+    status: string,
+  ) => {
+    artifacts.push({
+      id: record.id,
+      domain,
+      title,
+      kind,
+      maturity: clamp01(maturity),
+      risk: clamp01(risk),
+      participants,
+      traits: [...(record.traits ?? [])],
+      palette: readPalette(record.visualDirection, domain === 'law'
+        ? ['#f6cc70', '#f7ead0', '#bd694f']
+        : domain === 'culture' ? ['#d87fb7', '#f2d89c', '#4f9f8e']
+          : domain === 'invention' ? ['#64bad1', '#f4ca63', '#e9f0d7']
+            : ['#70ad76', '#f2ddad', '#b56e4d']),
+      status,
+      seed: record.glyphSeed,
+      ...mapPoint(record.position, bounds, commons),
+    });
+  };
+  agency.inventions.forEach((item) => pushArtifact(item, 'invention', item.name, item.principle, item.maturity, item.risk, item.createdBy, 'working'));
+  agency.charterLaws.forEach((item: LivingLaw) => pushArtifact(item, 'law', item.name, item.text, item.strength, 1 - item.contestability, item.authoredBy, item.amendments ? 'amended' : 'living'));
+  agency.cultures.forEach((item: CulturalPractice) => pushArtifact(item, 'culture', item.name, item.practice, item.adoption, 1 - item.diversity, item.carriers, item.mutations ? 'mutating' : 'living'));
+  agency.sites.forEach((item: CivicSite) => pushArtifact(item, 'site', item.title, item.kind, item.intensity, 1 - item.permeability, item.participants, item.status));
+
+  const routes: RouteSite[] = [];
+  // Paths are physical routes between inhabited places and the commons.
+  settlements.forEach((settlement, index) => {
+    if (Math.hypot(settlement.x - commons.x, settlement.y - commons.y) < 14) return;
+    routes.push({
+      id: `habitat-path-${settlement.id}`,
+      start: settlement,
+      control: curveBetween(settlement, commons, settlement.seed),
+      end: commons,
+      strength: 0.45 + settlement.openness * 0.45,
+      kind: 'footpath',
+      seed: settlement.seed + index * 31,
+    });
+  });
+  snapshot.relationships.filter((item) => item.exchanges > 0 || item.strength > 0.58).slice(-14).forEach((relationship, index) => {
+    const start = guildByVoice.get(relationship.a);
+    const end = guildByVoice.get(relationship.b);
+    if (!start || !end) return;
+    routes.push({
+      id: `${relationship.a}:${relationship.b}`,
+      start,
+      control: curveBetween(start, end, snapshot.seed + index * 73, 0.12),
+      end,
+      strength: clamp01(relationship.strength),
+      kind: 'trade',
+      a: relationship.a,
+      b: relationship.b,
+      seed: snapshot.seed + index * 233,
+    });
+  });
+
+  const river = buildRiver(snapshot.seed, bounds);
+  const tributaries = settlements.filter((settlement) => settlement.maturity > 0.16 || settlement.inhabitants > 8).slice(0, 6).map((settlement, index) => {
+    const riverPoint = polylinePoint(river, nearestRiverT(river, settlement));
+    const points: WorldPoint[] = [];
+    const control = curveBetween(settlement, riverPoint, settlement.seed + 890 + index, 0.2);
+    for (let step = 0; step <= 12; step += 1) {
+      const t = step / 12;
+      const one = 1 - t;
+      points.push({
+        x: one * one * settlement.x + 2 * one * t * control.x + t * t * riverPoint.x,
+        y: one * one * settlement.y + 2 * one * t * control.y + t * t * riverPoint.y,
+      });
+    }
+    routes.push({ id: `channel-${settlement.id}`, start: settlement, control, end: riverPoint, strength: settlement.maturity, kind: 'water-channel', seed: settlement.seed + 907 });
+    return points;
+  });
+
+  const arrivals = agency.arrivals.map((arrival, index): ArrivalSite => {
+    const origin = mapPoint(arrival.origin, bounds, { x: bounds.left - 50, y: commons.y });
+    const destination = mapPoint(arrival.destination, bounds, regionById.get(arrival.regionId) ?? commons);
+    const denominator = Math.max(24, arrival.timeToArrival + 30);
+    const terminal = ['settled', 'welcomed', 'diverted', 'refused'].includes(arrival.status);
+    return {
+      id: arrival.id,
+      name: arrival.name,
+      kind: arrival.kind,
+      origin,
+      destination,
+      progress: terminal ? 1 : clamp01(1 - arrival.timeToArrival / denominator),
+      status: arrival.status,
+      partySize: Math.max(0, arrival.partySize),
+      urgency: clamp01(arrival.urgency),
+      gifts: [...arrival.gifts],
+      needs: [...arrival.needs],
+      traits: [...arrival.traits],
+      palette: readPalette(arrival.visualDirection, ['#f4d06f', '#e77858', '#7ec9bc']),
+      seed: arrival.glyphSeed || snapshot.seed + index * 277,
+    };
+  });
+
+  const pressures = agency.pressures.filter((pressure) => pressure.state === 'active' || pressure.state === 'emerging').map((pressure, index): PressureSite => ({
+    id: pressure.id,
+    title: pressure.title,
+    ...mapPoint(pressure.position, bounds, commons),
+    radius: Math.max(34, pressure.radius * Math.min(bounds.width, bounds.height) * 0.9),
+    severity: clamp01(pressure.severity),
+    momentum: clamp01(pressure.momentum),
+    kind: pressure.kind,
+    focus: pressure.focus,
+    seed: pressure.glyphSeed || snapshot.seed + index * 283,
+  }));
+
+  const terrain: TerrainPatch[] = [];
+  regions.forEach((region, index) => {
+    const kind: BiomeKind = region.terrain === 'wetland' || region.terrain === 'delta' ? 'wetland'
+      : region.terrain === 'canopy' ? 'canopy'
+        : region.terrain === 'highland' || region.terrain === 'ruin' ? 'stone'
+          : region.pressure > 0.62 ? 'scarland'
+            : region.terrain === 'commons' ? 'cultivated' : 'meadow';
+    terrain.push({ x: region.x, y: region.y, rx: region.radius * 1.15, ry: region.radius * 0.62, rotation: hashSigned(region.seed, 310) * 0.25, kind, vitality: region.vitality, seed: region.seed + index * 47 });
+  });
+  for (let index = 0; index < 20; index += 1) {
+    const roll = hashUnit(snapshot.seed, 3300 + index);
+    terrain.push({
+      x: bounds.left + hashUnit(snapshot.seed, 3400 + index) * bounds.width,
+      y: bounds.top + hashUnit(snapshot.seed, 3500 + index) * bounds.height,
+      rx: 38 + hashUnit(snapshot.seed, 3600 + index) * 82,
+      ry: 20 + hashUnit(snapshot.seed, 3700 + index) * 42,
+      rotation: hashSigned(snapshot.seed, 3800 + index) * 0.45,
+      kind: roll < 0.18 ? 'canopy' : roll < 0.28 ? 'wetland' : roll < 0.72 ? 'meadow' : roll < 0.9 ? 'stone' : 'cultivated',
+      vitality: snapshot.qualities.biosphere,
+      seed: snapshot.seed + index * 311,
+    });
+  }
+
+  const trees: TreeSite[] = [];
+  const treeCount = 72 + Math.floor(snapshot.qualities.biosphere * 70);
+  for (let index = 0; index < treeCount; index += 1) {
+    const x = bounds.left + hashUnit(snapshot.seed, 4100 + index) * bounds.width;
+    const y = bounds.top + hashUnit(snapshot.seed, 4300 + index) * bounds.height;
+    const nearHabitat = settlements.some((settlement) => Math.hypot(x - settlement.x, y - settlement.y) < settlement.radius * 0.72);
+    const nearCommons = Math.hypot(x - commons.x, y - commons.y) < 42;
+    if (nearHabitat || nearCommons) continue;
+    const vitality = clamp01(snapshot.qualities.biosphere + hashSigned(snapshot.seed, 4500 + index) * 0.22);
+    trees.push({
+      x,
+      y,
+      size: 4.5 + hashUnit(snapshot.seed, 4600 + index) * 9,
+      kind: index % 13 === 0 ? 'fruit' : index % 17 === 0 ? 'reed' : vitality < 0.36 ? 'sapling' : 'tree',
+      vitality,
+      seed: snapshot.seed + index * 389,
+    });
+  }
+
+  const fields: FieldSite[] = settlements.flatMap((settlement, index) => {
+    const count = Math.max(1, Math.min(4, Math.ceil(settlement.inhabitants / 28) + (settlement.maturity > 0.48 ? 1 : 0)));
+    return Array.from({ length: count }, (_, fieldIndex): FieldSite => {
+      const side = fieldIndex % 2 === 0 ? 1 : -1;
+      return {
+        x: Math.max(bounds.left + 22, Math.min(bounds.right - 22, settlement.x + side * (settlement.radius * 0.72 + 22 + Math.floor(fieldIndex / 2) * 26))),
+        y: Math.max(bounds.top + 18, Math.min(bounds.bottom - 18, settlement.y + 18 + (fieldIndex % 3) * 19)),
+        width: 30 + Math.min(32, settlement.inhabitants * 0.45),
+        height: 17 + settlement.maturity * 13,
+        rotation: hashSigned(settlement.seed, 4800 + fieldIndex) * 0.17,
+        crop: (['grain', 'beans', 'orchard', 'wetland'] as const)[(index + fieldIndex) % 4]!,
+        maturity: clamp01(0.35 + settlement.maturity * 0.6),
+        seed: settlement.seed + fieldIndex * 419,
+      };
+    });
+  });
+
+  const bridges: BridgeSite[] = [];
+  const bridgeCount = Math.max(1, Math.min(5, 1 + Math.floor(agency.inventions.length / 2) + agency.sites.filter((site) => site.kind === 'crossing').length));
+  for (let index = 0; index < bridgeCount; index += 1) {
+    const t = 0.28 + (index + 1) / (bridgeCount + 2) * 0.48;
+    const point = polylinePoint(river, t);
+    const before = polylinePoint(river, Math.max(0, t - 0.015));
+    const after = polylinePoint(river, Math.min(1, t + 0.015));
+    bridges.push({
+      ...point,
+      angle: Math.atan2(after.y - before.y, after.x - before.x) + Math.PI / 2,
+      length: 34 + index * 4,
+      maturity: clamp01(0.45 + agency.inventions.length * 0.08 + snapshot.qualities.reciprocity * 0.25),
+      seed: snapshot.seed + index * 443,
+    });
+  }
+
+  const pulse = agency.lastAction?.pulse;
+  const lastAction = pulse ? {
+    verb: pulse.verb,
+    origin: mapPoint(pulse.origin, bounds, commons),
+    destination: mapPoint(pulse.destination, bounds, commons),
+    color: pulse.color,
+    magnitude: pulse.magnitude,
+    seed: pulse.seed,
+  } : null;
+
+  return {
+    width,
+    height,
+    bounds,
+    center,
+    river,
+    tributaries,
+    terrain,
+    regions,
+    settlements,
+    guilds,
+    works,
+    artifacts,
+    routes,
+    arrivals,
+    pressures,
+    trees,
+    fields,
+    bridges,
+    commons,
+    lastAction,
+    totalPopulation: settlements.reduce((sum, settlement) => sum + settlement.inhabitants, 0),
+    inventionCount: agency.inventions.length + snapshot.works.filter((work) => ['shared-word', 'consent-protocol', 'ecological-covenant', 'translation-braid'].includes(work.kind)).length,
+  };
+}

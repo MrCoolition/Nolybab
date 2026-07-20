@@ -112,6 +112,91 @@ export interface CivicResourceMap {
   possibility: number;
 }
 
+export interface MaterialStockMap {
+  /** Drinkable water held in cisterns, ponds, roots, and vessels. */
+  water: number;
+  /** Edible stores after seed and soil obligations are reserved. */
+  food: number;
+  /** Reusable timber, fiber, clay, stone, metal, and biological matter. */
+  materials: number;
+  /** Useful heat, motion, light, and stored low-energy work. */
+  energy: number;
+  /** Medicines, clean bandages, fermentation cultures, and care supplies. */
+  medicine: number;
+}
+
+export interface BasicNeedMap {
+  /** Coverage from available clean water and water access. */
+  water: number;
+  /** Coverage from food production and stores. */
+  food: number;
+  /** Share of people with safe, weather-fit shelter. */
+  shelter: number;
+  /** Capacity for health, rest, childcare, disability, and elder care. */
+  care: number;
+  /** Whether people can belong without surrendering authorship. */
+  belonging: number;
+}
+
+export interface SettlementEconomy {
+  stocks: MaterialStockMap;
+  production: MaterialStockMap;
+  consumption: MaterialStockMap;
+  needs: BasicNeedMap;
+  housingCapacity: number;
+  laborAvailable: number;
+  laborCommitted: number;
+  health: number;
+  belonging: number;
+  ecologicalLoad: number;
+  lastNet: MaterialStockMap;
+}
+
+export interface SeasonLedgerEntry {
+  season: number;
+  generation: number;
+  name: string;
+  population: number;
+  births: number;
+  deaths: number;
+  arrivals: number;
+  departures: number;
+  lowestNeed: keyof BasicNeedMap;
+  summary: string;
+}
+
+export type CivilizationStage = 'landing' | 'survival' | 'rooting' | 'commonwealth' | 'flourishing' | 'fracture';
+
+export interface CivilizationState {
+  season: number;
+  seasonName: string;
+  seasonProgress: number;
+  generation: number;
+  stage: CivilizationStage;
+  population: number;
+  households: number;
+  children: number;
+  elders: number;
+  laborAvailable: number;
+  laborCommitted: number;
+  stocks: MaterialStockMap;
+  production: MaterialStockMap;
+  consumption: MaterialStockMap;
+  needs: BasicNeedMap;
+  housingCapacity: number;
+  wellbeing: number;
+  legitimacy: number;
+  equality: number;
+  ecologicalLoad: number;
+  carryingCapacity: number;
+  birthsLastSeason: number;
+  deathsLastSeason: number;
+  arrivalsLastSeason: number;
+  departuresLastSeason: number;
+  lastSeasonSummary: string;
+  ledger: SeasonLedgerEntry[];
+}
+
 export interface CivicTargetRef {
   kind: CivicTargetKind;
   id: string;
@@ -173,6 +258,8 @@ export interface Settlement {
   originActionId: string;
   revision: number;
   glyphSeed: number;
+  /** Concrete local stocks, work, need coverage, and ecological cost. */
+  economy?: SettlementEconomy;
 }
 
 export interface CivicInvention {
@@ -318,6 +405,9 @@ export interface CivicActionPreview {
   novelty: number;
   predicted: ActionOutcomeBand;
   creates: CivicDomain | 'site' | null;
+  laborCost: number;
+  duration: number;
+  materialCost: Partial<MaterialStockMap>;
   consequences: string[];
 }
 
@@ -391,6 +481,8 @@ export interface PlayerAgencyState {
   recentlyUsedVerbs: CivicVerb[];
   worldCondition: WorldCondition;
   nanoWorldLines: Record<string, string>;
+  /** Deterministic people/land/season simulation. */
+  civilization: CivilizationState;
 }
 
 export interface VoiceDefinition {
